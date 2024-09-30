@@ -60,7 +60,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 # Training loop
 num_epochs = 250
 best_accuracy = 0.0
-patience = 50  # Number of epochs to wait for improvement
+patience = 75  # Number of epochs to wait for improvement
 trigger_times = 0
 
 # Training loop
@@ -115,7 +115,7 @@ for epoch in range(num_epochs):
     else:
         trigger_times += 1
 
-    if trigger_times >= patience:
+    if trigger_times >= patience or test_accuracy == 100:
         print(f'Early stopping at epoch {epoch + 1}. Best accuracy: {best_accuracy:.2f}%')
         break
 
