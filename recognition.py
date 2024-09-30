@@ -9,9 +9,11 @@ from torchvision import transforms
 
 
 def load_model():
+    path = 'models/best_tile_classifier.pth'
+    #path = 'models/tile_classifier_with_weights.pth'
     model = models.resnet18()  # No pretraining this time, as we're loading a trained model
     model.fc = nn.Linear(model.fc.in_features, num_classes)  # Adjust the final layer to match the number of classes
-    model.load_state_dict(torch.load('models/best_tile_classifier.pth', map_location=torch.device('cpu'),
+    model.load_state_dict(torch.load(path, map_location=torch.device('cpu'),
                                      weights_only=True))  # Load the model weights
     model.eval()  # Set the model to evaluation mode
     return model
@@ -65,7 +67,8 @@ for root, dirs, files in os.walk("dataset/test"):
         for file in os.listdir(f"dataset/test/{dir}"):
             image_path = os.path.join(root, dir, file)
             predicted_class, confidence = classify_tile(model, image_path)
-            print(f'predicted tile for {file} is: {predicted_class}, correct is {dir}, confidence: {confidence:.2f}')
+            if predicted_class != dir:
+                print(f'predicted tile for {file} is: {predicted_class}, correct is {dir}, confidence: {confidence:.2f}')
 
 # Example usage
 # image_path = 'dataset/test/Addition/row_4_tile_6_1727083909347.png'  # Path to the tile image
