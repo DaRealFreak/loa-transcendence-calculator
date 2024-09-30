@@ -150,7 +150,7 @@ class Transcendence:
             # Convert confidence from tensor to a Python float
             confidence_value = confidence.item()
 
-            print(f"Row {row.row} Tile {i + 1} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
+            #print(f"Row {row.row} Tile {i + 1} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
             tile_types.append((confidence_value, predicted_class))
 
         return tile_types
@@ -168,7 +168,7 @@ class Transcendence:
                 Row((768, 507), (1157, 547), 6, 5),
                 Row((763, 549), (1162, 592), 6, 6),
             ],
-            # level 4,5,6,7 of transcendence have 7 tiles in each row
+            # level 4,5 of transcendence have 7 tiles in each row
             7: [
                 Row((760, 341), (1165, 373), 7, 1),
                 Row((755, 375), (1170, 408), 7, 2),
@@ -179,9 +179,20 @@ class Transcendence:
                 Row((730, 571), (1196, 615), 7, 7),
 
             ],
+            # level 6,7 of transcendence have 8 tiles in each row
+            8: [
+                Row((734, 324), (1191, 356), 8, 1),
+                Row((729, 357), (1197, 390), 8, 2),
+                Row((723, 392), (1203, 426), 8, 3),
+                Row((717, 428), (1209, 465), 8, 4),
+                Row((711, 467), (1215, 505), 8, 5),
+                Row((704, 507), (1222, 547), 8, 6),
+                Row((697, 549), (1230, 592), 8, 7),
+                Row((690, 594), (1237, 638), 8, 8),
+            ]
         }
 
-        rows = complexities[7]
+        rows = complexities[8]
 
         start_time = time.time()
         iterations = 1
