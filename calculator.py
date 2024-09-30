@@ -158,18 +158,35 @@ class Transcendence:
     def run(self):
         print("Transcendence script started")
 
-        rows = [
-            Row((786, 357), (1138, 391), 6, 1),
-            Row((782, 392), (1143, 426), 6, 2),
-            Row((778, 428), (1147, 465), 6, 3),
-            Row((773, 467), (1152, 505), 6, 4),
-            Row((768, 507), (1157, 547), 6, 5),
-            Row((763, 549), (1162, 592), 6, 6),
-        ]
+        complexities = {
+            # level 1,2,3 of transcendence have 6 tiles in each row
+            6: [
+                Row((786, 357), (1138, 391), 6, 1),
+                Row((782, 392), (1143, 426), 6, 2),
+                Row((778, 428), (1147, 465), 6, 3),
+                Row((773, 467), (1152, 505), 6, 4),
+                Row((768, 507), (1157, 547), 6, 5),
+                Row((763, 549), (1162, 592), 6, 6),
+            ],
+            # level 4,5,6,7 of transcendence have 7 tiles in each row
+            7: [
+                Row((760, 341), (1165, 373), 7, 1),
+                Row((755, 375), (1170, 408), 7, 2),
+                Row((750, 410), (1175, 445), 7, 3),
+                Row((745, 447), (1181, 485), 7, 4),
+                Row((740, 486), (1186, 526), 7, 5),
+                Row((735, 528), (1191, 569), 7, 6),
+                Row((730, 571), (1196, 615), 7, 7),
+
+            ],
+        }
+
+        rows = complexities[7]
 
         start_time = time.time()
         iterations = 1
         current_board = {}
+        #self.highlight_row(complexities[7][6])
         for i in range(iterations):
             # take a screenshot of the current board to analyze (faster than taking a screenshot for each tile)
             current_screenshot = pyautogui.screenshot()
