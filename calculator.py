@@ -446,36 +446,35 @@ class Transcendence:
                 current_screenshot, change_area, self.changes_model, self.changes_class_names, 'change'
             )
             current_grace = self.check_screenshot_area(
-                current_screenshot, grace_area, self.changes_model, self.changes_class_names, 'grace'
+                current_screenshot, grace_area, self.grace_model, self.grace_class_names, 'grace'
             )
 
             current_level = self.check_screenshot_area(
                 current_screenshot, level_area, self.level_model, self.level_class_names, 'level'
             )
 
-            if current_level[1] in (1, 2, 3):
+            if int(current_level[1]) in (1, 2, 3):
                 rows = complexities[6]
-            elif current_level[1] in (4, 5):
+            elif int(current_level[1]) in (4, 5):
                 rows = complexities[7]
             else:
                 rows = complexities[8]
 
-            if True:
-                for row in rows:
-                    tmp_row = self.check_row(current_screenshot, row)
-                    if row.row not in current_board:
-                        current_board[row.row] = tmp_row
-                    else:
-                        # iterate over all rows and update the row info with the highest confidence
-                        for j in range(row.tile_count):
-                            if tmp_row[j][0] > current_board[row.row][j][0]:
-                                current_board[row.row][j] = tmp_row[j]
+            for row in rows:
+                tmp_row = self.check_row(current_screenshot, row)
+                if row.row not in current_board:
+                    current_board[row.row] = tmp_row
+                else:
+                    # iterate over all rows and update the row info with the highest confidence
+                    for j in range(row.tile_count):
+                        if tmp_row[j][0] > current_board[row.row][j][0]:
+                            current_board[row.row][j] = tmp_row[j]
 
         pprint(current_board)
         pprint(current_cards)
         print(f'{current_retries[1]} retries with confidence {current_retries[0] * 100:.2f}%')
         print(f'{current_changes[1]} changes with confidence {current_changes[0] * 100:.2f}%')
-        print(f'{current_grace[1]} grace with confidence {current_grace[0] * 100:.2f}%')
+        print(f'current grace level is {current_grace[1]} with confidence {current_grace[0] * 100:.2f}%')
         print(f'Current transcendence level is {current_level[1]} with confidence {current_level[0] * 100:.2f}%')
 
         print("Transcendence script finished in", time.time() - start_time, "seconds")
