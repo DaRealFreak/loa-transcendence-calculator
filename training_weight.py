@@ -185,7 +185,7 @@ class WeightModelTraining:
 # To train a ResNet18 model
 classifier = WeightModelTraining(
     model_name='resnet18',
-    data_dir='dataset/', data_type='level',
+    data_dir='dataset/', data_type='grace',
     num_epochs=250,
     patience=0,
     all_correct_required=0,
