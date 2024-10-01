@@ -111,7 +111,7 @@ class ImageRecognizer:
 
 # Example usage:
 # Initialize the recognizer for tile classification
-recognizer = ImageRecognizer(data_type='tiles')
+recognizer = ImageRecognizer(data_type='level')
 
 # Evaluate the test dataset and print incorrect classifications
 recognizer.evaluate_dataset()

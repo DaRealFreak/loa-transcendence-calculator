@@ -38,6 +38,7 @@ class WeightModelTraining:
 
         # Setup device (GPU or CPU)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f'Using device: {self.device}')
         self.model = self.model.to(self.device)
 
         # Define class weights based on the dataset
@@ -184,8 +185,8 @@ class WeightModelTraining:
 # To train a ResNet18 model
 classifier = WeightModelTraining(
     model_name='resnet18',
-    data_dir='dataset/', data_type='changes',
-    num_epochs=100,
+    data_dir='dataset/', data_type='level',
+    num_epochs=250,
     patience=0,
     all_correct_required=0,
     add_noise=True, add_brightness=True
