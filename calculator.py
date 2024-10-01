@@ -170,23 +170,22 @@ class Transcendence:
             model.eval()
             self.changes_model = model
 
-        # ToDo: train the level and grace models
         if self.level_model is None:
             model = models.resnet18()
-            model.fc = nn.Linear(model.fc.in_features, self.changes_num_classes)
+            model.fc = nn.Linear(model.fc.in_features, self.level_num_classes)
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             model = model.to(device)
-            model.load_state_dict(torch.load('models/changes/best_tile_classifier.pth', map_location=device,
+            model.load_state_dict(torch.load('models/level/best_tile_classifier.pth', map_location=device,
                                              weights_only=True))
             model.eval()
             self.level_model = model
 
         if self.grace_model is None:
             model = models.resnet18()
-            model.fc = nn.Linear(model.fc.in_features, self.changes_num_classes)
+            model.fc = nn.Linear(model.fc.in_features, self.grace_num_classes)
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             model = model.to(device)
-            model.load_state_dict(torch.load('models/changes/best_tile_classifier.pth', map_location=device,
+            model.load_state_dict(torch.load('models/grace/best_tile_classifier.pth', map_location=device,
                                              weights_only=True))
             model.eval()
             self.grace_model = model
@@ -423,14 +422,14 @@ class Transcendence:
         level_area = ScreenshotArea((772, 20), (1136, 45))
         grace_area = ScreenshotArea((414, 44), (476, 67))
 
-        rows = complexities[8]
-
         start_time = time.time()
         iterations = 1
         current_board = {}
         current_cards = {}
         current_retries = (0, 0)
         current_changes = (0, 0)
+        current_grace = (0, 0)
+        current_level = (0, 0)
 
         # self.highlight_row(complexities[7][6])
         for i in range(iterations):
@@ -444,13 +443,22 @@ class Transcendence:
                 current_screenshot, retry_area, self.tries_model, self.tries_class_names, 'retry'
             )
             current_changes = self.check_screenshot_area(
-                current_screenshot, change_area, self.changes_model, self.changes_class_names, 'change', True
+                current_screenshot, change_area, self.changes_model, self.changes_class_names, 'change'
             )
             current_grace = self.check_screenshot_area(
-                current_screenshot, grace_area, self.changes_model, self.changes_class_names, 'grace', True
+                current_screenshot, grace_area, self.changes_model, self.changes_class_names, 'grace'
             )
 
-            self.check_level(current_screenshot, level_area, True)
+            current_level = self.check_screenshot_area(
+                current_screenshot, level_area, self.level_model, self.level_class_names, 'level'
+            )
+
+            if current_level[1] in (1, 2, 3):
+                rows = complexities[6]
+            elif current_level[1] in (4, 5):
+                rows = complexities[7]
+            else:
+                rows = complexities[8]
 
             if True:
                 for row in rows:
@@ -467,6 +475,8 @@ class Transcendence:
         pprint(current_cards)
         print(f'{current_retries[1]} retries with confidence {current_retries[0] * 100:.2f}%')
         print(f'{current_changes[1]} changes with confidence {current_changes[0] * 100:.2f}%')
+        print(f'{current_grace[1]} grace with confidence {current_grace[0] * 100:.2f}%')
+        print(f'Current transcendence level is {current_level[1]} with confidence {current_level[0] * 100:.2f}%')
 
         print("Transcendence script finished in", time.time() - start_time, "seconds")
 
