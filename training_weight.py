@@ -6,136 +6,148 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 
-# Define the tile classes and their respective sample sizes
-class_counts = {}
-for trainings_dir in os.listdir("dataset/train"):
-    class_counts[trainings_dir] = len(os.listdir(f"dataset/train/{trainings_dir}"))
 
-# Calculate class weights (inverse of the class frequency)
-total_samples = sum(class_counts.values())
-class_weights = {cls: total_samples / count for cls, count in class_counts.items()}
+class WeightModelTraining:
+    def __init__(self, model_name='resnet18', num_epochs=250, patience=75, data_dir='dataset/', data_type='tile'):
+        self.model_name = model_name
+        self.num_epochs = num_epochs
+        self.patience = patience
+        self.data_dir = data_dir
+        self.data_type = data_type
 
-# Convert weights to a tensor, ensuring order matches dataset class order
-# Assuming the dataset uses the same alphabetical order as the class names
-weights = torch.tensor([class_weights[cls] for cls in sorted(class_counts.keys())], dtype=torch.float)
+        # Load and initialize the model
+        self.model = self._initialize_model()
 
-# Define image transformations
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # ImageNet normalization
-])
+        # Setup device (GPU or CPU)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = self.model.to(self.device)
 
-# Load your dataset (use appropriate directory)
-data_dir = 'dataset/'
-train_dataset = datasets.ImageFolder(os.path.join(data_dir, 'train'), transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        # Define class weights based on the dataset
+        self.class_counts = self._calculate_class_counts()
+        self.class_weights = self._calculate_class_weights()
 
-test_dataset = datasets.ImageFolder(os.path.join(data_dir, 'test'), transform=transform)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+        # Move class weights to the same device as the model
+        self.weights = torch.tensor([self.class_weights[cls] for cls in sorted(self.class_counts.keys())],
+                                    dtype=torch.float).to(self.device)
 
-# Load the model (ResNet18)
-model = models.resnet18(weights='ResNet18_Weights.DEFAULT')
-num_classes = len(class_counts)
-model.fc = nn.Linear(model.fc.in_features, num_classes)
+        # Define criterion and optimizer
+        self.criterion = nn.CrossEntropyLoss(weight=self.weights)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
 
-# Move model to GPU if available
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = model.to(device)
+        # Set up data loaders
+        self.train_loader, self.test_loader = self._load_data()
 
-if torch.cuda.is_available():
-    print('Using GPU for training.')
-else:
-    print('Using CPU for training.')
+    def _initialize_model(self):
+        """Initialize the model based on the model_name passed."""
+        num_classes = len(os.listdir(os.path.join(self.data_dir, self.data_type, 'train')))
 
-# Move class weights to the same device as the model
-weights = weights.to(device)
+        if self.model_name == 'resnet18':
+            model = models.resnet18(weights='ResNet18_Weights.DEFAULT')
+        elif self.model_name == 'resnet50':
+            model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+        # Add more models as needed
+        else:
+            raise ValueError(f"Model {self.model_name} not supported")
 
-# Use class weights in CrossEntropyLoss
-criterion = nn.CrossEntropyLoss(weight=weights)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        return model
 
-# Define the optimizer
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+    def _calculate_class_counts(self):
+        """Calculate the number of samples per class in the dataset."""
+        class_counts = {}
+        for trainings_dir in os.listdir(os.path.join(self.data_dir, self.data_type, 'train')):
+            class_counts[trainings_dir] = len(
+                os.listdir(os.path.join(self.data_dir, self.data_type, 'train', trainings_dir)))
+        return class_counts
 
-# Training loop
-num_epochs = 250
-best_accuracy = 0.0
-patience = 75  # Number of epochs to wait for improvement
-trigger_times = 0
+    def _calculate_class_weights(self):
+        """Calculate class weights based on class frequency."""
+        total_samples = sum(self.class_counts.values())
+        class_weights = {cls: total_samples / count for cls, count in self.class_counts.items()}
+        return class_weights
 
-# Training loop
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
-    correct = 0
-    total = 0
+    def _load_data(self):
+        """Load training and testing datasets."""
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # ImageNet normalization
+        ])
 
-    # Training loop
-    for inputs, labels in train_loader:
-        # Move inputs and labels to the same device as the model (cuda or cpu)
-        inputs, labels = inputs.to(device), labels.to(device)
+        train_dataset = datasets.ImageFolder(os.path.join(self.data_dir, self.data_type, 'train'), transform=transform)
+        test_dataset = datasets.ImageFolder(os.path.join(self.data_dir, self.data_type, 'test'), transform=transform)
 
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-        running_loss += loss.item() * inputs.size(0)
-        _, predicted = torch.max(outputs, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+        return train_loader, test_loader
 
-    epoch_accuracy = 100 * correct / total
-    print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss / total:.4f}, Accuracy: {epoch_accuracy:.2f}%')
-
-    # Test/Validation loop
-    model.eval()
-    test_correct = 0
-    test_total = 0
-    with torch.no_grad():
-        for inputs, labels in test_loader:
-            # Move inputs and labels to the same device as the model (cuda or cpu)
-            inputs, labels = inputs.to(device), labels.to(device)
-
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs, 1)
-            test_total += labels.size(0)
-            test_correct += (predicted == labels).sum().item()
-
-    test_accuracy = 100 * test_correct / test_total
-    print(f'Test Accuracy: {test_accuracy:.2f}%')
-
-    # Early Stopping
-    if test_accuracy > best_accuracy:
-        best_accuracy = test_accuracy
+    def train(self):
+        """Train the model with early stopping."""
+        best_accuracy = 0.0
         trigger_times = 0
-        # Optionally save the best model
-        torch.save(model.state_dict(), 'models/best_tile_classifier.pth')
-    else:
-        trigger_times += 1
 
-    if trigger_times >= patience or test_accuracy == 100:
-        print(f'Early stopping at epoch {epoch + 1}. Best accuracy: {best_accuracy:.2f}%')
-        break
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            running_loss = 0.0
+            correct = 0
+            total = 0
 
-# Test loop
-model.eval()  # Set the model to evaluation mode
-correct = 0
-total = 0
+            # Training loop
+            for inputs, labels in self.train_loader:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, labels)
+                loss.backward()
+                self.optimizer.step()
 
-with torch.no_grad():
-    for inputs, labels in test_loader:
-        # Move inputs and labels to the same device as the model (cuda or cpu)
-        inputs, labels = inputs.to(device), labels.to(device)
+                running_loss += loss.item() * inputs.size(0)
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-        outputs = model(inputs)
-        _, predicted = torch.max(outputs, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+            epoch_accuracy = 100 * correct / total
+            print(
+                f'Epoch [{epoch + 1}/{self.num_epochs}], Loss: {running_loss / total:.4f}, Accuracy: {epoch_accuracy:.2f}%'
+            )
 
-test_accuracy = 100 * correct / total
-print(f'Test Accuracy: {test_accuracy:.2f}%')
+            # Validation loop
+            test_accuracy = self.evaluate()
+            print(f'Test Accuracy: {test_accuracy:.2f}%')
 
-# Save the trained model
-torch.save(model.state_dict(), 'models/tile_classifier_with_weights.pth')
+            # Early Stopping
+            if test_accuracy > best_accuracy:
+                best_accuracy = test_accuracy
+                trigger_times = 0
+                torch.save(self.model.state_dict(), f'models/{self.data_type}/best_tile_classifier.pth')
+            else:
+                trigger_times += 1
+
+            if trigger_times >= self.patience or test_accuracy == 100:
+                print(f'Early stopping at epoch {epoch + 1}. Best accuracy: {best_accuracy:.2f}%')
+                break
+
+        print(f'Final Test Accuracy: {best_accuracy:.2f}%')
+
+    def evaluate(self):
+        """Evaluate the model on the test dataset."""
+        self.model.eval()
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for inputs, labels in self.test_loader:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.model(inputs)
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        return 100 * correct / total
+
+
+# Example usage:
+# To train a ResNet18 model
+classifier = WeightModelTraining(model_name='resnet18', data_dir='dataset/', data_type='tile')
+classifier.train()
