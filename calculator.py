@@ -52,7 +52,7 @@ class Transcendence:
         self.model = None
 
         # Class labels, must match the order used during training (folders in ImageFolder)
-        self.class_names = os.listdir("dataset/train")
+        self.class_names = os.listdir("dataset/tiles/train")
         # Define the same model structure as in the training script
         self.num_classes = len(self.class_names)  # Number of tile types
 
@@ -80,7 +80,7 @@ class Transcendence:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             model = model.to(device)
             # Load the model weights
-            model.load_state_dict(torch.load('models/best_tile_classifier.pth', map_location=device,
+            model.load_state_dict(torch.load('models/tiles/best_tile_classifier.pth', map_location=device,
                                              weights_only=True))
             model.eval()  # Set the model to evaluation mode
             self.model = model
