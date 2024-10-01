@@ -87,6 +87,7 @@ class Transcendence:
         self.script_dir = realpath(dirname(__file__))
         self.tile_model = None
         self.card_model = None
+        self.tries_model = None
 
         # Class labels, must match the order used during training (folders in ImageFolder)
         self.tile_class_names = os.listdir("dataset/tiles/train")
@@ -95,6 +96,9 @@ class Transcendence:
 
         self.card_class_names = os.listdir("dataset/cards/train")
         self.card_num_classes = len(self.card_class_names)
+
+        self.tries_class_names = os.listdir("dataset/tries/train")
+        self.tries_num_classes = len(self.tries_class_names)
 
         # Image transformations (should match the ones used in training)
         # Input size for the model (for ResNet, 224x224 is standard)
@@ -134,6 +138,17 @@ class Transcendence:
                                              weights_only=True))
             model.eval()
             self.card_model = model
+
+        if self.tries_model is None:
+            model = models.resnet18()
+            model.fc = nn.Linear(model.fc.in_features, self.tries_num_classes)
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            model = model.to(device)
+            model.load_state_dict(torch.load('models/tries/best_tile_classifier.pth', map_location=device,
+                                             weights_only=True))
+            model.eval()
+            self.tries_model = model
+
 
     @staticmethod
     def highlight_row(row: Row):
@@ -199,7 +214,7 @@ class Transcendence:
         print(f"Card {card.position} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
         return confidence_value, predicted_class
 
-    def check_retries(self, screenshot: Image, retry_area: ScreenshotArea, save_screenshot: bool = False):
+    def check_retries(self, screenshot: Image, retry_area: ScreenshotArea, save_screenshot: bool = False) -> tuple[float, str]:
         """
         Check the retry area for the retry count
 
@@ -216,6 +231,32 @@ class Transcendence:
             tmp_screenshot.save(
                 f"{self.script_dir}/assets/transcendence/dumps/retry_{int(time.time() * 1000)}.png"
             )
+
+        # Ensure the image is RGB
+        image = tmp_screenshot.convert('RGB')
+
+        # Apply the transformations
+        # Add a batch dimension (1, C, H, W)
+        image_tensor = self.transform(image).unsqueeze(0)
+        image_tensor = image_tensor.to(device)
+
+        # Perform the prediction
+        # Disable gradient computation (we're just doing inference)
+        with torch.no_grad():
+            output = self.tries_model(image_tensor)
+
+        # Apply softmax to get probabilities
+        probabilities = F.softmax(output, dim=1)
+
+        # Get the predicted class index and its probability
+        confidence, predicted_class_idx = torch.max(probabilities, 1)
+        predicted_try_count = self.tries_class_names[predicted_class_idx.item()]
+
+        # Convert confidence from tensor to a Python float
+        confidence_value = confidence.item()
+
+        print(f"Try count is {predicted_try_count} with confidence {confidence_value * 100:.2f}%")
+        return confidence_value, predicted_try_count
 
     def check_change(self, screenshot: Image, change_area: ScreenshotArea, save_screenshot: bool = False):
         """
@@ -365,7 +406,9 @@ class Transcendence:
                 confidence, card_name = self.check_card(current_screenshot, card, True)
                 current_cards[card.position] = (confidence, card_name)
 
-            self.check_retries(current_screenshot, retry_area, True)
+            confidence, retries = self.check_retries(current_screenshot, retry_area, True)
+            print("Retries:", retries)
+
             self.check_change(current_screenshot, change_area, True)
             self.check_level(current_screenshot, level_area, True)
 
