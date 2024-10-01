@@ -7,11 +7,29 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 
 
+# Function to inject random Gaussian noise into the image
+class AddGaussianNoise(object):
+    def __init__(self, mean=0., std=1.):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        noise = torch.randn(tensor.size()) * self.std + self.mean
+        return tensor + noise
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(mean={self.mean}, std={self.std})'
+
+
 class WeightModelTraining:
-    def __init__(self, model_name='resnet18', num_epochs=250, patience=75, data_dir='dataset/', data_type='tile'):
+    def __init__(self, model_name='resnet18',
+                 num_epochs=250, patience=75, all_correct_required=5,
+                 data_dir='dataset/', data_type='tiles',
+                 add_noise=False, add_brightness=False):
         self.model_name = model_name
         self.num_epochs = num_epochs
         self.patience = patience
+        self.all_correct_required = all_correct_required
         self.data_dir = data_dir
         self.data_type = data_type
 
@@ -35,7 +53,7 @@ class WeightModelTraining:
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
 
         # Set up data loaders
-        self.train_loader, self.test_loader = self._load_data()
+        self.train_loader, self.test_loader = self._load_data(add_noise=add_noise, add_brightness=add_brightness)
 
     def _initialize_model(self):
         """Initialize the model based on the model_name passed."""
@@ -66,13 +84,20 @@ class WeightModelTraining:
         class_weights = {cls: total_samples / count for cls, count in self.class_counts.items()}
         return class_weights
 
-    def _load_data(self):
+    def _load_data(self, add_noise=False, add_brightness=False):
         """Load training and testing datasets."""
-        transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # ImageNet normalization
-        ])
+        transformations = [transforms.Resize((224, 224))]
+        if add_brightness:
+            # Randomly adjust brightness (50% to 150% of the original)
+            transformations.append(transforms.ColorJitter(brightness=(0.5, 1.5)))
+        transformations.append(transforms.ToTensor())
+        if add_noise:
+            # Add Gaussian noise to the image
+            transformations.append(AddGaussianNoise(mean=0.0, std=0.1))
+        # Normalize the image based on ImageNet statistics
+        transformations.append(transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]))
+
+        transform = transforms.Compose(transformations)
 
         train_dataset = datasets.ImageFolder(os.path.join(self.data_dir, self.data_type, 'train'), transform=transform)
         test_dataset = datasets.ImageFolder(os.path.join(self.data_dir, self.data_type, 'test'), transform=transform)
@@ -86,6 +111,7 @@ class WeightModelTraining:
         """Train the model with early stopping."""
         best_accuracy = 0.0
         trigger_times = 0
+        all_correct_times = 0
 
         for epoch in range(self.num_epochs):
             self.model.train()
@@ -116,6 +142,13 @@ class WeightModelTraining:
             test_accuracy = self.evaluate()
             print(f'Test Accuracy: {test_accuracy:.2f}%')
 
+            if test_accuracy == 100 and self.all_correct_required > 0:
+                all_correct_times += 1
+                if all_correct_times >= self.all_correct_required:
+                    print(f'All correct {self.all_correct_required} times. Stopping training.')
+                    torch.save(self.model.state_dict(), f'models/{self.data_type}/best_tile_classifier.pth')
+                    break
+
             # Early Stopping
             if test_accuracy > best_accuracy:
                 best_accuracy = test_accuracy
@@ -124,7 +157,7 @@ class WeightModelTraining:
             else:
                 trigger_times += 1
 
-            if trigger_times >= self.patience or test_accuracy == 100:
+            if trigger_times >= self.patience:
                 print(f'Early stopping at epoch {epoch + 1}. Best accuracy: {best_accuracy:.2f}%')
                 break
 
@@ -149,5 +182,10 @@ class WeightModelTraining:
 
 # Example usage:
 # To train a ResNet18 model
-classifier = WeightModelTraining(model_name='resnet18', data_dir='dataset/', data_type='tile')
+classifier = WeightModelTraining(
+    model_name='resnet18',
+    data_dir='dataset/', data_type='cards',
+    all_correct_required=5,
+    add_noise=True, add_brightness=True
+)
 classifier.train()
