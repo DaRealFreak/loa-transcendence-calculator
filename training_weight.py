@@ -150,14 +150,14 @@ class WeightModelTraining:
                     break
 
             # Early Stopping
-            if test_accuracy > best_accuracy:
+            if test_accuracy >= best_accuracy:
                 best_accuracy = test_accuracy
                 trigger_times = 0
                 torch.save(self.model.state_dict(), f'models/{self.data_type}/best_tile_classifier.pth')
             else:
                 trigger_times += 1
 
-            if trigger_times >= self.patience:
+            if 0 < self.patience <= trigger_times:
                 print(f'Early stopping at epoch {epoch + 1}. Best accuracy: {best_accuracy:.2f}%')
                 break
 
@@ -184,8 +184,10 @@ class WeightModelTraining:
 # To train a ResNet18 model
 classifier = WeightModelTraining(
     model_name='resnet18',
-    data_dir='dataset/', data_type='cards',
-    all_correct_required=5,
+    data_dir='dataset/', data_type='changes',
+    num_epochs=100,
+    patience=0,
+    all_correct_required=0,
     add_noise=True, add_brightness=True
 )
 classifier.train()
