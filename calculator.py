@@ -46,15 +46,55 @@ class Row:
         )
 
 
+class ScreenshotArea:
+    def __init__(self, top_left: tuple, bot_right: tuple, description: str = None):
+        """
+        Initialize a screenshot area with the given parameters
+        :param top_left:
+        :param bot_right:
+        """
+        self.top_left = top_left
+        self.bot_right = bot_right
+
+    def get_field(self) -> tuple[int, int, int, int]:
+        """
+        Get the coordinates of the field
+
+        :return:
+        """
+        return (
+            self.top_left[0],
+            self.top_left[1],
+            self.bot_right[0],
+            self.bot_right[1]
+        )
+
+
+class Card(ScreenshotArea):
+    def __init__(self, top_left: tuple, bot_right: tuple, position: int):
+        """
+        Initialize a card with the given parameters
+
+        :param top_left: top left xy coordinates of the card
+        :param bot_right: bottom right xy coordinates of the card
+        """
+        super().__init__(top_left, bot_right)
+        self.position = position
+
+
 class Transcendence:
     def __init__(self):
         self.script_dir = realpath(dirname(__file__))
-        self.model = None
+        self.tile_model = None
+        self.card_model = None
 
         # Class labels, must match the order used during training (folders in ImageFolder)
-        self.class_names = os.listdir("dataset/tiles/train")
+        self.tile_class_names = os.listdir("dataset/tiles/train")
         # Define the same model structure as in the training script
-        self.num_classes = len(self.class_names)  # Number of tile types
+        self.tile_num_classes = len(self.tile_class_names)  # Number of tile types
+
+        self.card_class_names = os.listdir("dataset/cards/train")
+        self.card_num_classes = len(self.card_class_names)
 
         # Image transformations (should match the ones used in training)
         # Input size for the model (for ResNet, 224x224 is standard)
@@ -64,27 +104,36 @@ class Transcendence:
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-        self.load_model()
+        self.load_models()
 
         # select tile  (tr -> row, td -> column, current one is 7th row, 8th column)
         # document.querySelector('.border-separate > tbody:nth-child(1) > tr:nth-child(7) > td:nth-child(8) > div:nth-child(1) > div:nth-child(3)').click()
         # select special field (1 -> normal, 2 -> destroyed, 3 -> distorted, 4 -> addition, 5 -> blessing, 6 -> mystery, 7 -> enhancement, 8 -> clone, 9 -> relocation)
         # document.querySelector('.z-20 > ul:nth-child(1) > li:nth-child(2)').click()
 
-    def load_model(self):
-        if self.model is None:
+    def load_models(self):
+        if self.tile_model is None:
             # No pretraining this time, as we're loading a trained model
             model = models.resnet18()
             # Adjust the final layer to match the number of classes
-            model.fc = nn.Linear(model.fc.in_features, self.num_classes)
+            model.fc = nn.Linear(model.fc.in_features, self.tile_num_classes)
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             model = model.to(device)
             # Load the model weights
             model.load_state_dict(torch.load('models/tiles/best_tile_classifier.pth', map_location=device,
                                              weights_only=True))
-            model.eval()  # Set the model to evaluation mode
-            self.model = model
-        return self.model
+            model.eval()
+            self.tile_model = model
+
+        if self.card_model is None:
+            model = models.resnet18()
+            model.fc = nn.Linear(model.fc.in_features, self.card_num_classes)
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            model = model.to(device)
+            model.load_state_dict(torch.load('models/cards/best_tile_classifier.pth', map_location=device,
+                                             weights_only=True))
+            model.eval()
+            self.card_model = model
 
     @staticmethod
     def highlight_row(row: Row):
@@ -105,6 +154,104 @@ class Transcendence:
                 dcObj.Rectangle((int(row.top_left[0] + i * row.width), int(row.top_left[1]),
                                  int(row.top_left[0] + (i + 1) * row.width), int(row.bot_right[1])))
             win32gui.InvalidateRect(hwnd, monitor, True)  # Refresh the entire monitor
+
+    def check_card(self, screenshot: Image, card: Card, save_screenshot: bool = False) -> tuple[float, str]:
+        """
+        Check the card for the different card types
+
+        :param screenshot:
+        :param card:
+        :param save_screenshot:
+        :return:
+        """
+        # Ensure the input and model are on the same device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        tmp_screenshot = screenshot.crop(card.get_field())
+
+        if save_screenshot:
+            tmp_screenshot.save(
+                f"{self.script_dir}/assets/transcendence/dumps/card_{card.position}_{int(time.time() * 1000)}.png"
+            )
+
+        # Ensure the image is RGB
+        image = tmp_screenshot.convert('RGB')
+
+        # Apply the transformations
+        # Add a batch dimension (1, C, H, W)
+        image_tensor = self.transform(image).unsqueeze(0)
+        image_tensor = image_tensor.to(device)
+
+        # Perform the prediction
+        # Disable gradient computation (we're just doing inference)
+        with torch.no_grad():
+            output = self.card_model(image_tensor)
+
+        # Apply softmax to get probabilities
+        probabilities = F.softmax(output, dim=1)
+
+        # Get the predicted class index and its probability
+        confidence, predicted_class_idx = torch.max(probabilities, 1)
+        predicted_class = self.card_class_names[predicted_class_idx.item()]
+
+        # Convert confidence from tensor to a Python float
+        confidence_value = confidence.item()
+
+        print(f"Card {card.position} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
+        return confidence_value, predicted_class
+
+    def check_retries(self, screenshot: Image, retry_area: ScreenshotArea, save_screenshot: bool = False):
+        """
+        Check the retry area for the retry count
+
+        :param screenshot:
+        :param retry_area:
+        :param save_screenshot:
+        :return:
+        """
+        # Ensure the input and model are on the same device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        tmp_screenshot = screenshot.crop(retry_area.get_field())
+
+        if save_screenshot:
+            tmp_screenshot.save(
+                f"{self.script_dir}/assets/transcendence/dumps/retry_{int(time.time() * 1000)}.png"
+            )
+
+    def check_change(self, screenshot: Image, change_area: ScreenshotArea, save_screenshot: bool = False):
+        """
+        Check the change area for the change count
+
+        :param screenshot:
+        :param change_area:
+        :param save_screenshot:
+        :return:
+        """
+        # Ensure the input and model are on the same device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        tmp_screenshot = screenshot.crop(change_area.get_field())
+
+        if save_screenshot:
+            tmp_screenshot.save(
+                f"{self.script_dir}/assets/transcendence/dumps/change_{int(time.time() * 1000)}.png"
+            )
+
+    def check_level(self, screenshot: Image, level_area: ScreenshotArea, save_screenshot: bool = False):
+        """
+        Check the level area for the level count
+
+        :param screenshot:
+        :param level_area:
+        :param save_screenshot:
+        :return:
+        """
+        # Ensure the input and model are on the same device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        tmp_screenshot = screenshot.crop(level_area.get_field())
+
+        if save_screenshot:
+            tmp_screenshot.save(
+                f"{self.script_dir}/assets/transcendence/dumps/level_{int(time.time() * 1000)}.png"
+            )
 
     def check_row(self, screenshot: Image, row: Row, save_screenshot: bool = False):
         """
@@ -138,19 +285,19 @@ class Transcendence:
             # Perform the prediction
             # Disable gradient computation (we're just doing inference)
             with torch.no_grad():
-                output = self.model(image_tensor)
+                output = self.tile_model(image_tensor)
 
             # Apply softmax to get probabilities
             probabilities = F.softmax(output, dim=1)
 
             # Get the predicted class index and its probability
             confidence, predicted_class_idx = torch.max(probabilities, 1)
-            predicted_class = self.class_names[predicted_class_idx.item()]
+            predicted_class = self.tile_class_names[predicted_class_idx.item()]
 
             # Convert confidence from tensor to a Python float
             confidence_value = confidence.item()
 
-            #print(f"Row {row.row} Tile {i + 1} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
+            # print(f"Row {row.row} Tile {i + 1} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
             tile_types.append((confidence_value, predicted_class))
 
         return tile_types
@@ -192,26 +339,49 @@ class Transcendence:
             ]
         }
 
+        cards = [
+            Card((434, 951), (483, 1014), 5),
+            Card((514, 951), (563, 1014), 4),
+            Card((594, 918), (670, 1014), 3),
+            Card((735, 787), (888, 1018), 2),
+            Card((1029, 787), (1181, 1018), 1),
+        ]
+
+        retry_area = ScreenshotArea((1066, 726), (1173, 750))
+        change_area = ScreenshotArea((902, 1046), (1013, 1076))
+        level_area = ScreenshotArea((772, 20), (1136, 45))
+
         rows = complexities[8]
 
         start_time = time.time()
         iterations = 1
         current_board = {}
-        #self.highlight_row(complexities[7][6])
+        current_cards = {}
+        # self.highlight_row(complexities[7][6])
         for i in range(iterations):
             # take a screenshot of the current board to analyze (faster than taking a screenshot for each tile)
             current_screenshot = pyautogui.screenshot()
-            for row in rows:
-                tmp_row = self.check_row(current_screenshot, row, True)
-                if row.row not in current_board:
-                    current_board[row.row] = tmp_row
-                else:
-                    # iterate over all rows and update the row info with the highest confidence
-                    for j in range(row.tile_count):
-                        if tmp_row[j][0] > current_board[row.row][j][0]:
-                            current_board[row.row][j] = tmp_row[j]
+            for card in cards[::-1]:
+                confidence, card_name = self.check_card(current_screenshot, card, True)
+                current_cards[card.position] = (confidence, card_name)
+
+            self.check_retries(current_screenshot, retry_area, True)
+            self.check_change(current_screenshot, change_area, True)
+            self.check_level(current_screenshot, level_area, True)
+
+            if False:
+                for row in rows:
+                    tmp_row = self.check_row(current_screenshot, row, True)
+                    if row.row not in current_board:
+                        current_board[row.row] = tmp_row
+                    else:
+                        # iterate over all rows and update the row info with the highest confidence
+                        for j in range(row.tile_count):
+                            if tmp_row[j][0] > current_board[row.row][j][0]:
+                                current_board[row.row][j] = tmp_row[j]
 
         pprint(current_board)
+        pprint(current_cards)
 
         print("Transcendence script finished in", time.time() - start_time, "seconds")
 
