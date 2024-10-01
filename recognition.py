@@ -8,69 +8,110 @@ from PIL import Image
 from torchvision import transforms
 
 
-def load_model():
-    path = 'models/best_tile_classifier.pth'
-    #path = 'models/tile_classifier_with_weights.pth'
-    model = models.resnet18()  # No pretraining this time, as we're loading a trained model
-    model.fc = nn.Linear(model.fc.in_features, num_classes)  # Adjust the final layer to match the number of classes
-    model.load_state_dict(torch.load(path, map_location=torch.device('cpu'),
-                                     weights_only=True))  # Load the model weights
-    model.eval()  # Set the model to evaluation mode
-    return model
+class ImageRecognizer:
+    def __init__(self, data_type='tiles'):
+        """
+        Initializes the ImageRecognizer class.
+
+        :param data_type: Type of data being classified (default is 'tiles').
+        """
+        self.data_type = data_type
+
+        # Set the device to GPU if available, otherwise CPU
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f'Using device: {self.device}')
+
+        # Initialize model and load weights
+        self.class_names = os.listdir(f"dataset/{data_type}/train")
+        self.num_classes = len(self.class_names)
+        self.model = self.load_model()
+
+        # Define the transformations to apply to the input images
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # ImageNet normalization
+        ])
+
+    def load_model(self):
+        """
+        Loads the model architecture and weights based on the trained model.
+        """
+        # Using ResNet18 by default, can extend for other types
+        model = models.resnet18()
+
+        # Modify the final layer to match the number of classes
+        model.fc = nn.Linear(model.fc.in_features, self.num_classes)
+
+        # Load the trained weights
+        model.load_state_dict(
+            torch.load(
+                os.path.join(f'models/{self.data_type}/best_tile_classifier.pth'),
+                map_location=self.device,
+                weights_only=True
+            )
+        )
+
+        # Move model to the device
+        model = model.to(self.device)
+
+        # Set model to evaluation mode
+        model.eval()
+
+        return model
+
+    def classify_tile(self, image_path):
+        """
+        Classifies a single tile image and returns the predicted class and confidence.
+
+        :param image_path: Path to the image file.
+        :return: (predicted_class, confidence_value)
+        """
+        # Load the image
+        image = Image.open(image_path).convert('RGB')
+
+        # Apply the transformations to the image
+        image_tensor = self.transform(image).unsqueeze(0)  # Add batch dimension (1, C, H, W)
+
+        # Move image tensor to the same device as the model
+        image_tensor = image_tensor.to(self.device)
+
+        # Perform the classification
+        with torch.no_grad():
+            output = self.model(image_tensor)
+
+        # Apply softmax to get probabilities
+        probabilities = F.softmax(output, dim=1)
+
+        # Get the predicted class and confidence
+        confidence, predicted_class_idx = torch.max(probabilities, 1)
+        predicted_class = self.class_names[predicted_class_idx.item()]
+        confidence_value = confidence.item()
+
+        return predicted_class, confidence_value
+
+    def evaluate_dataset(self, dataset_dir='test'):
+        """
+        Evaluates the model on the test dataset and prints out incorrect predictions.
+
+        :param dataset_dir: Directory of the test dataset.
+        """
+        for root, dirs, files in os.walk(os.path.join(f'dataset/{self.data_type}/{dataset_dir}')):
+            for single_dir in dirs:
+                for file in os.listdir(os.path.join(root, single_dir)):
+                    image_path = os.path.join(root, single_dir, file)
+                    predicted_class, confidence = self.classify_tile(image_path)
+
+                    # Print only when the prediction is incorrect
+                    if predicted_class != single_dir:
+                        print(
+                            f'Predicted tile for {file} is: {predicted_class}, correct is {single_dir}, confidence: {confidence:.2f}'
+                        )
 
 
-# Image transformations (should match the ones used in training)
-input_size = 224  # Input size for the model (for ResNet, 224x224 is standard)
-transform = transforms.Compose([
-    transforms.Resize((input_size, input_size)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+# Example usage:
+# Initialize the recognizer for tile classification
+recognizer = ImageRecognizer(data_type='tiles')
 
-# Class labels, must match the order used during training (folders in ImageFolder)
-class_names = os.listdir("dataset/train")
-# Define the same model structure as in the training script
-num_classes = len(class_names)  # Number of tile types
-
-
-# Function to classify an image with confidence score
-def classify_tile(model, image_path):
-    # Load the image using Pillow
-    image = Image.open(image_path).convert('RGB')  # Ensure the image is RGB
-
-    # Apply the transformations
-    image_tensor = transform(image).unsqueeze(0)  # Add a batch dimension (1, C, H, W)
-
-    # Perform the prediction
-    with torch.no_grad():  # Disable gradient computation (we're just doing inference)
-        output = model(image_tensor)
-
-    # Apply softmax to get probabilities
-    probabilities = F.softmax(output, dim=1)
-
-    # Get the predicted class index and its probability
-    confidence, predicted_class_idx = torch.max(probabilities, 1)
-    predicted_class = class_names[predicted_class_idx.item()]
-
-    # Convert confidence from tensor to a Python float
-    confidence_value = confidence.item()
-
-    return predicted_class, confidence_value
-
-
-# Load the model
-model = load_model()
-
-# go through all folders in dataset/test and classify all files in each folder and classify them
-for root, dirs, files in os.walk("dataset/test"):
-    for dir in dirs:
-        for file in os.listdir(f"dataset/test/{dir}"):
-            image_path = os.path.join(root, dir, file)
-            predicted_class, confidence = classify_tile(model, image_path)
-            if predicted_class != dir:
-                print(f'predicted tile for {file} is: {predicted_class}, correct is {dir}, confidence: {confidence:.2f}')
-
-# Example usage
-# image_path = 'dataset/test/Addition/row_4_tile_6_1727083909347.png'  # Path to the tile image
-# predicted_class = classify_tile(image_path)
-# print(f'The predicted tile class is: {predicted_class}')
+# Evaluate the test dataset and print incorrect classifications
+recognizer.evaluate_dataset()
