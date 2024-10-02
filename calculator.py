@@ -297,7 +297,7 @@ class Transcendence:
             # Append the prediction for the tile area
             predictions.append(
                 self._process_screenshot(screenshot, tile_area, self.models['tiles'], self.class_names['tiles'],
-                                         screenshot_type=f"row_{row.row}_tile_{i}",
+                                         screenshot_type=f"row_{row.row}_tile_{i + 1}",
                                          screenshot_dir=os.path.join(self.screenshot_dir, 'tiles'),
                                          save=self.save_screenshots)
             )
