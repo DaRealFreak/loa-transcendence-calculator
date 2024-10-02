@@ -82,6 +82,46 @@ class Card(ScreenshotArea):
         self.position = position
 
 
+class Prediction:
+    def __init__(self, confidence: float, prediction: str):
+        self.confidence = confidence
+        self.prediction = prediction
+
+    def __repr__(self) -> str:
+        return f"({self.prediction}, {('{:.6f}'.format(self.confidence * 100)).rstrip('0').rstrip('.')}%)"
+
+
+class TranscendenceInfo:
+    def __init__(self, gear_part: str, level: Prediction, grace: Prediction,
+                 retries: Prediction, changes: Prediction,
+                 cards: dict[int, Prediction], board: dict[int | None, list[Prediction]],
+                 duration: float = 0):
+        self.gear_part = gear_part
+        self.level = level
+        self.grace = grace
+        self.retries = retries
+        self.changes = changes
+        self.cards = cards
+        self.board = board
+        self.duration = duration
+
+    def __repr__(self) -> str:
+        # Formatting the Cards dictionary with each key-value pair on a new line
+        formatted_cards = "\n".join([f"  {k}: {v}" for k, v in self.cards.items()])
+
+        # Formatting the Board dictionary with each key-value pair on a new line
+        formatted_board = "\n".join([f"  {k}: {v}" for k, v in self.board.items()])
+
+        return (f"Gear part: {self.gear_part}\n"
+                f"Level: {self.level}\n"
+                f"Grace: {self.grace}\n"
+                f"Retries: {self.retries}\n"
+                f"Changes: {self.changes}\n"
+                f"Cards:\n{formatted_cards}\n"
+                f"Board:\n{formatted_board}\n"
+                f"Duration: {self.duration:.2f} seconds")
+
+
 class Transcendence:
     def __init__(self):
         self.script_dir = realpath(dirname(__file__))
@@ -119,14 +159,14 @@ class Transcendence:
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-        self.load_models()
+        self._load_models()
 
         # select tile  (tr -> row, td -> column, current one is 7th row, 8th column)
         # document.querySelector('.border-separate > tbody:nth-child(1) > tr:nth-child(7) > td:nth-child(8) > div:nth-child(1) > div:nth-child(3)').click()
         # select special field (1 -> normal, 2 -> destroyed, 3 -> distorted, 4 -> addition, 5 -> blessing, 6 -> mystery, 7 -> enhancement, 8 -> clone, 9 -> relocation)
         # document.querySelector('.z-20 > ul:nth-child(1) > li:nth-child(2)').click()
 
-    def load_models(self):
+    def _load_models(self):
         if self.tile_model is None:
             # No pretraining this time, as we're loading a trained model
             model = models.resnet18()
@@ -210,7 +250,7 @@ class Transcendence:
                                  int(row.top_left[0] + (i + 1) * row.width), int(row.bot_right[1])))
             win32gui.InvalidateRect(hwnd, monitor, True)  # Refresh the entire monitor
 
-    def check_card(self, screenshot: Image, card: Card, save_screenshot: bool = False) -> tuple[float, str]:
+    def _check_card(self, screenshot: Image, card: Card, save_screenshot: bool = False) -> Prediction:
         """
         Check the card for the different card types
 
@@ -251,15 +291,15 @@ class Transcendence:
         # Convert confidence from tensor to a Python float
         confidence_value = confidence.item()
 
-        print(f"Card {card.position} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
-        return confidence_value, predicted_class
+        # print(f"Card {card.position} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
+        return Prediction(confidence_value, predicted_class)
 
-    def check_screenshot_area(self,
-                              screenshot: Image, area: ScreenshotArea,
-                              model: nn.Module, class_names: list[str],
-                              screenshot_type='untyped',
-                              save_screenshot: bool = False
-                              ) -> tuple[float, str]:
+    def _check_screenshot_area(self,
+                               screenshot: Image, area: ScreenshotArea,
+                               model: nn.Module, class_names: list[str],
+                               screenshot_type='untyped',
+                               save_screenshot: bool = False
+                               ) -> Prediction:
         """
         Check the screenshot area for the different tile types
 
@@ -303,27 +343,9 @@ class Transcendence:
         # Convert confidence from tensor to a Python float
         confidence_value = confidence.item()
 
-        return confidence_value, predicted_item
+        return Prediction(confidence_value, predicted_item)
 
-    def check_level(self, screenshot: Image, level_area: ScreenshotArea, save_screenshot: bool = False):
-        """
-        Check the level area for the level count
-
-        :param screenshot:
-        :param level_area:
-        :param save_screenshot:
-        :return:
-        """
-        # Ensure the input and model are on the same device
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        tmp_screenshot = screenshot.crop(level_area.get_field())
-
-        if save_screenshot:
-            tmp_screenshot.save(
-                f"{self.script_dir}/assets/transcendence/dumps/level_{int(time.time() * 1000)}.png"
-            )
-
-    def check_row(self, screenshot: Image, row: Row, save_screenshot: bool = False):
+    def _check_row(self, screenshot: Image, row: Row, save_screenshot: bool = False) -> list[Prediction]:
         """
         Check the row for the different tile types
 
@@ -368,13 +390,43 @@ class Transcendence:
             confidence_value = confidence.item()
 
             # print(f"Row {row.row} Tile {i + 1} is {predicted_class} with confidence {confidence_value * 100:.2f}%")
-            tile_types.append((confidence_value, predicted_class))
+            tile_types.append(Prediction(confidence_value, predicted_class))
 
         return tile_types
 
-    def run(self):
-        print("Transcendence script started")
+    def _get_current_equipment_parts(self) -> str:
+        """
+        Get the current equipment parts
 
+        :return:
+        """
+        try:
+            selection = pyautogui.locateOnScreen(
+                f"{self.script_dir}/assets/transcendence/current_equipment_selection.png",
+                confidence=0.9,
+                region=(60, 80, 150 - 60, 700 - 80))
+
+            # switch case for the different equipment parts
+            if selection is not None:
+                y = selection.top + selection.height // 2
+                if 110 < y < 200:
+                    return 'helmet'
+                elif 210 < y < 300:
+                    return 'shoulders'
+                elif 310 < y < 400:
+                    return 'chestpiece'
+                elif 410 < y < 500:
+                    return 'pants'
+                elif 510 < y < 600:
+                    return 'gloves'
+                elif 610 < y < 700:
+                    return 'weapon'
+                else:
+                    return ''
+        except pyautogui.ImageNotFoundException:
+            return ''
+
+    def get_current_information(self) -> TranscendenceInfo:
         complexities = {
             # level 1,2,3 of transcendence have 6 tiles in each row
             6: [
@@ -430,55 +482,58 @@ class Transcendence:
         current_changes = (0, 0)
         current_grace = (0, 0)
         current_level = (0, 0)
+        current_equipment_part = self._get_current_equipment_parts()
 
         # self.highlight_row(complexities[7][6])
         for i in range(iterations):
             # take a screenshot of the current board to analyze (faster than taking a screenshot for each tile)
             current_screenshot = pyautogui.screenshot()
             for card in cards[::-1]:
-                confidence, card_name = self.check_card(current_screenshot, card)
-                current_cards[card.position] = (confidence, card_name)
+                current_cards[card.position] = self._check_card(current_screenshot, card)
 
-            current_retries = self.check_screenshot_area(
+            current_retries = self._check_screenshot_area(
                 current_screenshot, retry_area, self.tries_model, self.tries_class_names, 'retry'
             )
-            current_changes = self.check_screenshot_area(
+            current_changes = self._check_screenshot_area(
                 current_screenshot, change_area, self.changes_model, self.changes_class_names, 'change'
             )
-            current_grace = self.check_screenshot_area(
+            current_grace = self._check_screenshot_area(
                 current_screenshot, grace_area, self.grace_model, self.grace_class_names, 'grace'
             )
 
-            current_level = self.check_screenshot_area(
+            current_level = self._check_screenshot_area(
                 current_screenshot, level_area, self.level_model, self.level_class_names, 'level'
             )
 
-            if int(current_level[1]) in (1, 2, 3):
+            if int(current_level.prediction) in (1, 2, 3):
                 rows = complexities[6]
-            elif int(current_level[1]) in (4, 5):
+            elif int(current_level.prediction) in (4, 5):
                 rows = complexities[7]
             else:
                 rows = complexities[8]
 
             for row in rows:
-                tmp_row = self.check_row(current_screenshot, row)
+                tmp_row = self._check_row(current_screenshot, row)
                 if row.row not in current_board:
                     current_board[row.row] = tmp_row
                 else:
                     # iterate over all rows and update the row info with the highest confidence
                     for j in range(row.tile_count):
-                        if tmp_row[j][0] > current_board[row.row][j][0]:
+                        if tmp_row[j].confidence > current_board[row.row][j].confidence:
                             current_board[row.row][j] = tmp_row[j]
 
-        pprint(current_board)
-        pprint(current_cards)
-        print(f'{current_retries[1]} retries with confidence {current_retries[0] * 100:.2f}%')
-        print(f'{current_changes[1]} changes with confidence {current_changes[0] * 100:.2f}%')
-        print(f'current grace level is {current_grace[1]} with confidence {current_grace[0] * 100:.2f}%')
-        print(f'Current transcendence level is {current_level[1]} with confidence {current_level[0] * 100:.2f}%')
-
-        print("Transcendence script finished in", time.time() - start_time, "seconds")
+        return TranscendenceInfo(
+            gear_part=current_equipment_part,
+            level=current_level,
+            grace=current_grace,
+            retries=current_retries,
+            changes=current_changes,
+            cards=current_cards,
+            board=current_board,
+            duration=time.time() - start_time
+        )
 
 
 if __name__ == '__main__':
-    Transcendence().run()
+    info = Transcendence().get_current_information()
+    pprint(info)
