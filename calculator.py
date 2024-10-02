@@ -297,8 +297,9 @@ class Transcendence:
             # Append the prediction for the tile area
             predictions.append(
                 self._process_screenshot(screenshot, tile_area, self.models['tiles'], self.class_names['tiles'],
-                                         screenshot_type=f"row_{row.row}_tile_{i}", save=self.save_screenshots,
-                                         screenshot_dir=os.path.join(self.screenshot_dir, 'tiles'))
+                                         screenshot_type=f"row_{row.row}_tile_{i}",
+                                         screenshot_dir=os.path.join(self.screenshot_dir, 'tiles'),
+                                         save=self.save_screenshots)
             )
 
         return predictions
@@ -336,17 +337,26 @@ class Transcendence:
         :return: A list of rows based on the current level.
         """
         complexities = {
-            6: [Row((786, 357), (1138, 391), 6, 1), Row((782, 392), (1143, 426), 6, 2),
-                Row((778, 428), (1147, 465), 6, 3), Row((773, 467), (1152, 505), 6, 4),
-                Row((768, 507), (1157, 547), 6, 5), Row((763, 549), (1162, 592), 6, 6)],
+            6: [Row((786, 357), (1138, 391), 6, 1),
+                Row((782, 392), (1143, 426), 6, 2),
+                Row((778, 428), (1147, 465), 6, 3),
+                Row((773, 467), (1152, 505), 6, 4),
+                Row((768, 507), (1157, 547), 6, 5),
+                Row((763, 549), (1162, 592), 6, 6)],
 
-            7: [Row((759, 349), (1172, 381), 7, 1), Row((754, 385), (1177, 418), 7, 2),
-                Row((750, 421), (1181, 457), 7, 3), Row((745, 460), (1186, 498), 7, 4),
-                Row((741, 500), (1191, 541), 7, 5), Row((736, 543), (1196, 587), 7, 6)],
+            7: [Row((759, 349), (1172, 381), 7, 1),
+                Row((754, 385), (1177, 418), 7, 2),
+                Row((750, 421), (1181, 457), 7, 3),
+                Row((745, 460), (1186, 498), 7, 4),
+                Row((741, 500), (1191, 541), 7, 5),
+                Row((736, 543), (1196, 587), 7, 6)],
 
-            8: [Row((727, 337), (1207, 364), 8, 1), Row((723, 367), (1212, 395), 8, 2),
-                Row((718, 398), (1217, 428), 8, 3), Row((713, 431), (1222, 464), 8, 4),
-                Row((708, 465), (1227, 502), 8, 5), Row((703, 502), (1232, 542), 8, 6)]
+            8: [Row((727, 337), (1207, 364), 8, 1),
+                Row((723, 367), (1212, 395), 8, 2),
+                Row((718, 398), (1217, 428), 8, 3),
+                Row((713, 431), (1222, 464), 8, 4),
+                Row((708, 465), (1227, 502), 8, 5),
+                Row((703, 502), (1232, 542), 8, 6)]
         }
 
         # transcendence levels 1,2 and 3 have a complexity of 6 tiles per row
