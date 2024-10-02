@@ -244,7 +244,7 @@ class Transcendence:
         if save:
             self._save_screenshot(
                 cropped_image,
-                f"{screenshot_type}_screenshot_{time.time()}.png",
+                f"{screenshot_type}_screenshot_{int(time.time() * 1000)}.png",
                 screenshot_dir
             )
 
