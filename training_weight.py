@@ -89,8 +89,8 @@ class WeightModelTraining:
         """Load training and testing datasets."""
         transformations = [transforms.Resize((224, 224))]
         if add_brightness:
-            # Randomly adjust brightness (50% to 150% of the original)
-            transformations.append(transforms.ColorJitter(brightness=(0.5, 1.5)))
+            # Randomly adjust brightness (75% to 125% of the original)
+            transformations.append(transforms.ColorJitter(brightness=(0.75, 1.25)))
         transformations.append(transforms.ToTensor())
         if add_noise:
             # Add Gaussian noise to the image
@@ -185,10 +185,10 @@ class WeightModelTraining:
 # To train a ResNet18 model
 classifier = WeightModelTraining(
     model_name='resnet18',
-    data_dir='dataset/', data_type='grace',
+    data_dir='dataset/', data_type='tiles',
     num_epochs=250,
     patience=0,
-    all_correct_required=0,
-    add_noise=True, add_brightness=True
+    all_correct_required=20,
+    add_noise=False, add_brightness=False
 )
 classifier.train()
