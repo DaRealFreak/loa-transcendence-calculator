@@ -89,8 +89,8 @@ class WeightModelTraining:
         """Load training and testing datasets."""
         transformations = [transforms.Resize((224, 224))]
         if add_brightness:
-            # Randomly adjust brightness (75% to 125% of the original)
-            transformations.append(transforms.ColorJitter(brightness=(0.75, 1.25)))
+            # Randomly adjust brightness (90% to 110% of the original)
+            transformations.append(transforms.ColorJitter(brightness=(0.90, 1.10)))
         transformations.append(transforms.ToTensor())
         if add_noise:
             # Add Gaussian noise to the image
@@ -189,6 +189,6 @@ classifier = WeightModelTraining(
     num_epochs=250,
     patience=0,
     all_correct_required=20,
-    add_noise=False, add_brightness=False
+    add_noise=False, add_brightness=True
 )
 classifier.train()
