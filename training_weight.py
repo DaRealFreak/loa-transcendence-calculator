@@ -186,9 +186,9 @@ class WeightModelTraining:
 classifier = WeightModelTraining(
     model_name='resnet18',
     data_dir='dataset/', data_type='tiles',
-    num_epochs=250,
+    num_epochs=500,
     patience=0,
     all_correct_required=20,
-    add_noise=False, add_brightness=True
+    add_noise=False, add_brightness=False
 )
 classifier.train()
