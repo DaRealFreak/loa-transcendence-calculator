@@ -94,7 +94,7 @@ class Prediction:
 
 class TranscendenceInfo:
     def __init__(self, gear_part: str, level: Prediction, grace: Prediction,
-                 retries: Prediction, changes: Prediction, cards: dict[int, Prediction],
+                 tries: Prediction, changes: Prediction, cards: dict[int, Prediction],
                  board: dict[int | None, list[Prediction]], duration: float = 0):
         """
         Initialize the TranscendenceInfo object.
@@ -102,7 +102,7 @@ class TranscendenceInfo:
         :param gear_part: The current gear part being transcended.
         :param level: The predicted level of the transcendence.
         :param grace: The predicted grace of the transcendence.
-        :param retries: The predicted retries of the transcendence.
+        :param tries: The predicted retries of the transcendence.
         :param changes: The predicted changes of the transcendence.
         :param cards: The predicted cards of the transcendence.
         :param board: The predicted board of the transcendence.
@@ -111,7 +111,7 @@ class TranscendenceInfo:
         self.gear_part = gear_part
         self.level = level
         self.grace = grace
-        self.retries = retries
+        self.tries = tries
         self.changes = changes
         self.cards = cards
         self.board = board
@@ -128,7 +128,7 @@ class TranscendenceInfo:
         return (f"Gear part: {self.gear_part}\n"
                 f"Level: {self.level}\n"
                 f"Grace: {self.grace}\n"
-                f"Retries: {self.retries}\n"
+                f"Retries: {self.tries}\n"
                 f"Changes: {self.changes}\n"
                 f"Cards:\n{formatted_cards}\n"
                 f"Board:\n{formatted_board}\n"
@@ -423,7 +423,7 @@ class Transcendence:
             gear_part=current_equipment_part,
             level=current_info['level'],
             grace=current_info['grace'],
-            retries=current_info['tries'],
+            tries=current_info['tries'],
             changes=current_info['changes'],
             cards=current_cards,
             board=board,
