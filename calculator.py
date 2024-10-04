@@ -93,13 +93,14 @@ class Prediction:
 
 
 class TranscendenceInfo:
-    def __init__(self, gear_part: str, level: Prediction, grace: Prediction,
+    def __init__(self, gear_part: str, flowers: int, level: Prediction, grace: Prediction,
                  tries: Prediction, changes: Prediction, cards: dict[int, Prediction],
                  board: dict[int | None, list[Prediction]], duration: float = 0):
         """
         Initialize the TranscendenceInfo object.
 
         :param gear_part: The current gear part being transcended.
+        :param flowers: The number of flowers currently possible in the transcendence.
         :param level: The predicted level of the transcendence.
         :param grace: The predicted grace of the transcendence.
         :param tries: The predicted retries of the transcendence.
@@ -109,6 +110,7 @@ class TranscendenceInfo:
         :param duration: The duration of the transcending process.
         """
         self.gear_part = gear_part
+        self.flowers = flowers
         self.level = level
         self.grace = grace
         self.tries = tries
@@ -126,6 +128,7 @@ class TranscendenceInfo:
         formatted_cards = "\n".join([f"  {k}: {v}" for k, v in self.cards.items()])
         formatted_board = "\n".join([f"  {k}: {v}" for k, v in self.board.items()])
         return (f"Gear part: {self.gear_part}\n"
+                f"Flowers: {self.flowers}\n"
                 f"Level: {self.level}\n"
                 f"Grace: {self.grace}\n"
                 f"Retries: {self.tries}\n"
@@ -328,6 +331,21 @@ class Transcendence:
         except pyautogui.ImageNotFoundException:
             return ''
 
+    def _get_current_flowers(self) -> int:
+        """
+        Get the current number of flowers based on how many flower images we find on the screen.
+
+        :return: The current amount of flowers.
+        """
+        try:
+            selection = pyautogui.locateAllOnScreen(
+                f"{self.script_dir}/assets/transcendence/transcendence_flower.png",
+                confidence=0.9, region=(771, 718, 867 - 771, 750 - 718))
+            if selection:
+                return len(list(selection))
+        except pyautogui.ImageNotFoundException:
+            return 0
+
     @staticmethod
     def get_rows_based_on_level(level: int) -> list[Row]:
         """
@@ -416,11 +434,13 @@ class Transcendence:
         }
         current_cards = {card.position: self._check_card(screenshot, card) for card in cards[::-1]}
         current_equipment_part = self._get_current_equipment_part()
+        current_flowers = self._get_current_flowers()
         rows = self.get_rows_based_on_level(int(current_info['level'].prediction))
         board = {row.row: self._check_row(screenshot, row) for row in rows}
 
         return TranscendenceInfo(
             gear_part=current_equipment_part,
+            flowers=current_flowers,
             level=current_info['level'],
             grace=current_info['grace'],
             tries=current_info['tries'],
