@@ -2,10 +2,14 @@ import logging
 import time
 
 import pyautogui
-import pywinauto
 
 from calculator import Transcendence, Row, TranscendenceInfo
 from elphago import Elphago, Interaction, Use, Change
+
+
+class Reset(Interaction):
+    def __repr__(self):
+        return 'Reset()'
 
 
 class Game:
@@ -22,23 +26,44 @@ class Game:
         """
         Focuses the 'LostArk.exe' process to ensure it is the active window.
         """
-        try:
-            # Find the LostArk.exe process using pywinauto
-            app = pywinauto.Application().connect(title="LOST ARK (64-bit, DX11) v.2.32.4.1")
-            print("LostArk process found.")
-            app_dialog = app.top_window()
-            app_dialog.set_focus()
-            print("LostArk window focused.")
-        except pywinauto.findwindows.ElementNotFoundError:
-            print("LostArk process not found.")
-        except Exception as e:
-            print(f"Error focusing LostArk window: {e}")
+        # try:
+        #     # Find the LostArk.exe process using pywinauto
+        #     app = pywinauto.Application().connect(title="LOST ARK (64-bit, DX11) v.2.32.4.1")
+        #     print("LostArk process found.")
+        #     app_dialog = app.top_window()
+        #     app_dialog.set_focus()
+        #     print("LostArk window focused.")
+        # except pywinauto.findwindows.ElementNotFoundError:
+        #     print("LostArk process not found.")
+        # except Exception as e:
+        #     print(f"Error focusing LostArk window: {e}")
 
     def determine_move(self) -> Interaction:
-        # self._focus_lostark_window()
+        self._focus_lostark_window()
         self.last_information = self.calculator.get_current_information()
+        if not self.has_flowers_to_continue():
+            return Reset()
+
         self.elphago.sync_transcendence_info(self.last_information)
         return self.elphago.calculate()
+
+    def has_flowers_to_continue(self) -> bool:
+        """
+        Checks if there are enough flowers to continue transcending.
+
+        :return: if the current transcending has enough flowers to continue.
+        """
+        if self.last_information.flowers < 3:
+            # go through the board and check if there is a blessing tile, only avoid resetting if there is one
+            for row, predictions in enumerate(self.last_information.board.values(), start=1):
+                for tile, prediction in enumerate(predictions, start=1):
+                    # ignore blessing tile if we have less than 2 flowers
+                    if prediction.prediction == 'Blessing' and self.last_information.flowers == 2:
+                        return True
+            # less than 3 flowers and no blessing tile found
+            return False
+        # more than or equal to 3 flowers
+        return True
 
     def handle_interaction(self, interaction: Interaction) -> bool:
         """
@@ -56,7 +81,13 @@ class Game:
             print('Exiting, please check the game state.')
             return True
 
-        # self._focus_lostark_window()
+        # Check if there are enough flowers to continue
+        if not self.has_flowers_to_continue():
+            print('Not enough flowers, resetting the level.')
+            self.reset_level()
+            return False
+
+        self._focus_lostark_window()
         if isinstance(interaction, Use):
             if interaction.reset_recommended:
                 self.resets_recommended += 1
@@ -100,6 +131,10 @@ class Game:
                 self._click(x=815, y=1050)
             else:
                 raise ValueError(f'Invalid card number {interaction.card}')
+        elif isinstance(interaction, Reset):
+            print(f'Resetting current level for gear part: {self.last_information.gear_part}')
+            self.reset_level()
+            return False
 
         # sleep 2 second to allow the game to process the change
         time.sleep(2)
