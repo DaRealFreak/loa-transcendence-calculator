@@ -5,6 +5,7 @@ import time
 from os.path import realpath, dirname
 
 from selenium import webdriver
+from selenium.common import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
@@ -17,24 +18,27 @@ from calculator import TranscendenceInfo, Prediction, Transcendence
 
 
 class Interaction:
+    warning: str = ''
     card: int = None
     reset_recommended: bool = False
 
 
 class Change(Interaction):
-    def __init__(self, card: int, reset_recommended: bool):
+    def __init__(self, warning: str, card: int, reset_recommended: bool):
+        self.warning = warning
         self.card = card
         self.reset_recommended = reset_recommended
 
     def __str__(self):
-        return f"Change(card={self.card}, reset_recommended={self.reset_recommended})"
+        return f"Change(card={self.card}, warning={self.warning}, reset_recommended={self.reset_recommended})"
 
     def __repr__(self):
         return str(self)
 
 
 class Use(Interaction):
-    def __init__(self, row: int, column: int, card: int, probability: str, reset_recommended: bool):
+    def __init__(self, warning: str, row: int, column: int, card: int, probability: str, reset_recommended: bool):
+        self.warning = warning
         self.row = row
         self.column = column
         self.card = card
@@ -42,8 +46,8 @@ class Use(Interaction):
         self.reset_recommended = reset_recommended
 
     def __str__(self):
-        return f"Use(row={self.row}, column={self.column}, card={self.card}, " \
-               f"probability={self.probability}, reset_recommended={self.reset_recommended})"
+        return f"Use(row={self.row}, column={self.column}, card={self.card}, probability={self.probability}, " \
+               f"warning={self.warning}, reset_recommended={self.reset_recommended})"
 
     def __repr__(self):
         return str(self)
@@ -55,7 +59,7 @@ class Elphago:
     GECKODRIVER_PATH = os.path.join(BIN_DIR, 'geckodriver')
     ELPHAGO_URL = "https://cho.elphago.work/en"
 
-    def __init__(self, headless: bool = True, verbose: bool = False):
+    def __init__(self, headless: bool = True):
         """
         Initialize the Elphago object and open the Elphago website.
 
@@ -122,6 +126,11 @@ class Elphago:
 
         # Start Firefox with the specified driver and options
         self.driver = webdriver.Firefox(service=service, options=firefox_options)
+
+        # Move the window to the left side of the screen and maximize it
+        if not headless:
+            self.driver.set_window_position(-1000, 0)
+            self.driver.maximize_window()
 
     def _toggle_checkbox_and_confirm(self) -> bool:
         """
@@ -418,9 +427,11 @@ class Elphago:
         :return: The row and column index of the red border cell.
         """
         try:
-            # Find all the td elements with class 'border-red-500'
-            red_border_cells = self.driver.find_elements(By.CSS_SELECTOR,
-                                                         'table.border-separate > tbody td.border-red-500')
+            # Find all the td elements with class 'bg-red-500'
+            red_border_cells = self.driver.find_elements(
+                By.CSS_SELECTOR,
+                'table.border-separate > tbody td.bg-red-500'
+            )
             for cell in red_border_cells:
                 # Find the closest parent <tr> (row)
                 row_element = cell.find_element(By.XPATH, './ancestor::tr')
@@ -480,19 +491,24 @@ class Elphago:
             self.logger.error(f"Error occurred while getting probability: {e}")
             return None
 
-        # div.m-4 > div.bg-red-700
         try:
-            reset_recommended_element = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'div.m-4 > div.bg-red-700'))
+            WebDriverWait(self.driver, 1).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div.m-4 > div.bg-red-700:not(.hidden)'))
+            )
+            is_reset_recommended = True
+        except TimeoutException:
+            is_reset_recommended = False
+
+        warning = ''
+        try:
+            warning_element = WebDriverWait(self.driver, 1).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div.mt-4.ml-2 > div.text-red-600'))
             )
 
-            if 'hidden' in reset_recommended_element.get_attribute("class"):
-                is_reset_recommended = False
-            else:
-                is_reset_recommended = True
+            warning = warning_element.text
         except Exception as e:
-            self.logger.error(f"Error occurred while getting reset recommendation: {e}")
-            is_reset_recommended = False
+            self.logger.error(f"Error occurred while getting warning: {e}")
+            return None
 
         # Check both cards for probabilities and if change or use
         card_positions = {
@@ -518,11 +534,11 @@ class Elphago:
                 is_change = 'Change' == card_element.find_element(By.CSS_SELECTOR, "span").text
                 if is_recommended_card:
                     if row is not None and column is not None:
-                        return Use(row, column, pos, probability_text, is_reset_recommended)
+                        return Use(warning, row, column, pos, probability_text, is_reset_recommended)
                     else:
                         if not is_change:
                             raise ValueError(f"Card {pos} is recommended but neither change nor use.")
-                        return Change(pos, is_reset_recommended)
+                        return Change(warning, pos, is_reset_recommended)
             except Exception as e:
                 self.logger.error(f"Error occurred while getting card {pos}: {e}")
 
