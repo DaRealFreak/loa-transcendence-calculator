@@ -1,5 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
 .venv
-.idea
+
+# PyCharm
+.idea/
+
+# Binary dumps
 assets/transcendence/dumps
 bin
 screenshots
+page_screenshot.png
