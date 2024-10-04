@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import time
@@ -17,28 +18,32 @@ from calculator import TranscendenceInfo, Prediction, Transcendence
 
 class Interaction:
     card: int = None
+    reset_recommended: bool = False
 
 
 class Change(Interaction):
-    def __init__(self, card: int):
+    def __init__(self, card: int, reset_recommended: bool):
         self.card = card
+        self.reset_recommended = reset_recommended
 
     def __str__(self):
-        return f"Change(card={self.card})"
+        return f"Change(card={self.card}, reset_recommended={self.reset_recommended})"
 
     def __repr__(self):
         return str(self)
 
 
 class Use(Interaction):
-    def __init__(self, row: int, column: int, card: int, probability: str):
+    def __init__(self, row: int, column: int, card: int, probability: str, reset_recommended: bool):
         self.row = row
         self.column = column
         self.card = card
         self.probability = probability
+        self.reset_recommended = reset_recommended
 
     def __str__(self):
-        return f"Move(row={self.row}, column={self.column}, card={self.card}, probability={self.probability})"
+        return f"Use(row={self.row}, column={self.column}, card={self.card}, " \
+               f"probability={self.probability}, reset_recommended={self.reset_recommended})"
 
     def __repr__(self):
         return str(self)
@@ -50,12 +55,15 @@ class Elphago:
     GECKODRIVER_PATH = os.path.join(BIN_DIR, 'geckodriver')
     ELPHAGO_URL = "https://cho.elphago.work/en"
 
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: bool = True, verbose: bool = False):
         """
         Initialize the Elphago object and open the Elphago website.
 
         :param headless: Whether to run the WebDriver in headless mode (default is True).
         """
+        # Set up a logger
+        self.logger = logging.getLogger(__name__)
+
         # Set up the Firefox WebDriver
         self._setup_firefox(headless)
         self.driver.get(self.ELPHAGO_URL)
@@ -79,7 +87,7 @@ class Elphago:
         """
         Download geckodriver using webdriver_manager and move it to the bin directory.
         """
-        print("Geckodriver not found locally. Downloading...")
+        self.logger.info("Geckodriver not found locally. Downloading...")
         # Use webdriver_manager to download geckodriver
         gecko_path = GeckoDriverManager().install()
 
@@ -88,7 +96,7 @@ class Elphago:
 
         # Move the downloaded geckodriver to the bin folder
         shutil.copy(gecko_path, self.GECKODRIVER_PATH)
-        print(f"Geckodriver downloaded and saved to {self.GECKODRIVER_PATH}")
+        self.logger.info(f"Geckodriver downloaded and saved to {self.GECKODRIVER_PATH}")
 
     def _setup_firefox(self, headless: bool = True) -> None:
         """
@@ -137,9 +145,9 @@ class Elphago:
                 ".//button[contains(text(), '확인') or contains(text(), 'Confirm')]"
             )
             self.driver.execute_script("arguments[0].click();", confirm_button)
-            print("Confirm button clicked.")
+            self.logger.debug("Confirm button clicked.")
         except Exception as e:
-            print(f"Error occurred: {e}")
+            self.logger.error(f"Error occurred: {e}")
             return False
 
         return True
@@ -215,9 +223,9 @@ class Elphago:
                 EC.presence_of_element_located((By.CSS_SELECTOR, complete_selector))
             )
             self.driver.execute_script("arguments[0].click();", input_element)
-            print(f"Card selected: {card_name} at position {position}")
+            self.logger.debug(f"Card selected: {card_name} at position {position}")
         except Exception as e:
-            print(f"Error occurred while entering card name: {e}")
+            self.logger.error(f"Error occurred while entering card name: {e}")
 
     def _select_board(self, gear_part: str, level: int, grace: int) -> None:
         """
@@ -252,10 +260,10 @@ class Elphago:
                 # Use Select to interact with the dropdown and select the option with value "1"
                 select_dropdown = Select(select_element)
                 select_dropdown.select_by_value(str(values[gear_part.lower()]))
-                print(f"Gear part selected: {gear_part}")
+                self.logger.info(f"Gear part selected: {gear_part}")
                 self.current_gear_part = gear_part
             except Exception as e:
-                print(f"Error occurred while changing select value: {e}")
+                self.logger.error(f"Error occurred while changing select value: {e}")
 
         if level != self.current_level:
             try:
@@ -267,10 +275,10 @@ class Elphago:
                 # Use Select to interact with the dropdown and select the option with value "1"
                 select_dropdown = Select(select_element)
                 select_dropdown.select_by_value(str(level - 1))
-                print(f"Level selected: {level}")
+                self.logger.info(f"Level selected: {level}")
                 self.current_level = level
             except Exception as e:
-                print(f"Error occurred while changing select value: {e}")
+                self.logger.error(f"Error occurred while changing select value: {e}")
 
         if grace != self.current_grace:
             try:
@@ -281,10 +289,10 @@ class Elphago:
                 # Use Select to interact with the dropdown and select the option with value "1"
                 select_dropdown = Select(select_element)
                 select_dropdown.select_by_value(str(grace))
-                print(f"Grace selected: {grace}")
+                self.logger.info(f"Grace selected: {grace}")
                 self.current_grace = grace
             except Exception as e:
-                print(f"Error occurred while changing select value: {e}")
+                self.logger.error(f"Error occurred while changing select value: {e}")
 
         if reset_required:
             # Click the reset button to clear the current selection
@@ -293,7 +301,7 @@ class Elphago:
                 ".//button[contains(text(), '초기화') or contains(text(), 'Reset')]"
             )
             self.driver.execute_script("arguments[0].click();", reset_button)
-            print("Reset button clicked.")
+            self.logger.debug("Reset button clicked.")
 
     def _set_tries(self, tries: int) -> None:
         """
@@ -310,9 +318,9 @@ class Elphago:
             )
 
             self.driver.execute_script("arguments[0].click();", input_element)
-            print(f"Tries set to: {tries}")
+            self.logger.info(f"Tries set to: {tries}")
         except Exception as e:
-            print(f"Error occurred while changing tries: {e}")
+            self.logger.error(f"Error occurred while changing tries: {e}")
 
     def _set_changes(self, changes: int) -> None:
         """
@@ -329,7 +337,7 @@ class Elphago:
             )
 
             self.driver.execute_script("arguments[0].click();", input_element)
-            print(f"Changes set to: {changes}")
+            self.logger.info(f"Changes set to: {changes}")
         except Exception as parent_error:
             try:
                 input_element = WebDriverWait(self.driver, 10).until(
@@ -343,9 +351,9 @@ class Elphago:
 
                 # Get the text content of the last div
                 last_div_text = input_element.text
-                print(f"Changes set to the last available option: {last_div_text}")
+                self.logger.info(f"Changes set to the last available option: {last_div_text}")
             except Exception as e:
-                print(f"Error occurred while changing changes: {parent_error} and {e}")
+                self.logger.error(f"Error occurred while changing changes: {parent_error} and {e}")
 
     def _synchronize_board(self, board: dict[int | None, list[Prediction]]) -> None:
         """
@@ -353,6 +361,8 @@ class Elphago:
 
         :param board: The board state to sync with.
         """
+        self.logger.debug("Synchronizing board...")
+
         field_mapping = {
             'Normal': 1,
             'None': 2,
@@ -386,7 +396,7 @@ class Elphago:
                         f".border-separate > tbody > tr:nth-child({row}) > td:nth-child({tile}) > div"
                     )
                     if 'hidden' in parent_td.get_attribute("class"):
-                        # print(f"Tile at row {row}, column {tile} is hidden. Skipping.")
+                        self.logger.debug(f"Tile at row {row}, column {tile} is hidden. Skipping.")
                         continue
 
                     # Wait for the field element
@@ -397,11 +407,10 @@ class Elphago:
                     # Click the visible tile and then the corresponding field
                     self.driver.execute_script("arguments[0].click();", tile_element)
                     self.driver.execute_script("arguments[0].click();", field_element)
-
                 except Exception as e:
-                    print(f"Error occurred while changing tile at row {row}, column {tile}: {e}")
+                    self.logger.error(f"Error occurred while changing tile at row {row}, column {tile}: {e}")
 
-        print("Board synchronized.")
+        self.logger.debug("Board synchronized.")
 
     def _find_red_border_cells(self) -> tuple:
         """
@@ -422,10 +431,10 @@ class Elphago:
                 # Get the column index by checking the position of the <td> within the row
                 column_index = len(cell.find_elements(By.XPATH, 'preceding-sibling::td')) + 1
 
-                print(f"Element found at row {row_index}, column {column_index}")
+                self.logger.debug(f"Element found at row {row_index}, column {column_index}")
                 return row_index, column_index
         except Exception as e:
-            print(f"Error occurred: {e}")
+            self.logger.error(f"Error occurred: {e}")
 
         return None, None
 
@@ -454,7 +463,7 @@ class Elphago:
             ".//button[contains(text(), '계산하기') or contains(text(), 'Calculate')]"
         )
         self.driver.execute_script("arguments[0].click();", reset_button)
-        print("Calculate button clicked.")
+        self.logger.debug("Calculate button clicked.")
 
         # Wait for calculation:
         try:
@@ -466,10 +475,24 @@ class Elphago:
             probability_text = probability_element.text.replace('\n', ' ')
             if probability_text.startswith('1st'):
                 probability_text = probability_text[4:].strip()
-            print(f"Probability: {probability_text}")
+            self.logger.info(f"Probability: {probability_text}")
         except Exception as e:
-            print(f"Error occurred while getting probability: {e}")
+            self.logger.error(f"Error occurred while getting probability: {e}")
             return None
+
+        # div.m-4 > div.bg-red-700
+        try:
+            reset_recommended_element = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div.m-4 > div.bg-red-700'))
+            )
+
+            if 'hidden' in reset_recommended_element.get_attribute("class"):
+                is_reset_recommended = False
+            else:
+                is_reset_recommended = True
+        except Exception as e:
+            self.logger.error(f"Error occurred while getting reset recommendation: {e}")
+            is_reset_recommended = False
 
         # Check both cards for probabilities and if change or use
         card_positions = {
@@ -479,7 +502,7 @@ class Elphago:
 
         row, column = self._find_red_border_cells()
         if row is not None and column is not None:
-            print(f"Red border cell found at row {row}, column {column}")
+            self.logger.debug(f"Red border cell found at row {row}, column {column}")
 
         for pos, selector in card_positions.items():
             try:
@@ -495,18 +518,18 @@ class Elphago:
                 is_change = 'Change' == card_element.find_element(By.CSS_SELECTOR, "span").text
                 if is_recommended_card:
                     if row is not None and column is not None:
-                        return Use(row, column, pos, probability_text)
+                        return Use(row, column, pos, probability_text, is_reset_recommended)
                     else:
                         if not is_change:
                             raise ValueError(f"Card {pos} is recommended but neither change nor use.")
-                        return Change(pos)
+                        return Change(pos, is_reset_recommended)
             except Exception as e:
-                print(f"Error occurred while getting card {pos}: {e}")
+                self.logger.error(f"Error occurred while getting card {pos}: {e}")
 
     def save_screenshot(self) -> None:
         # Take a screenshot after interaction
         self.driver.save_screenshot('page_screenshot.png')
-        print("Screenshot saved as 'page_screenshot.png'")
+        self.logger.info("Screenshot saved as 'page_screenshot.png'")
 
 
 if __name__ == "__main__":
