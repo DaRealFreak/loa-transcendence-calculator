@@ -329,7 +329,7 @@ class Transcendence:
             return ''
 
     @staticmethod
-    def _get_rows_based_on_level(level: int) -> list[Row]:
+    def get_rows_based_on_level(level: int) -> list[Row]:
         """
         Get the rows based on the current level.
 
@@ -416,7 +416,7 @@ class Transcendence:
         }
         current_cards = {card.position: self._check_card(screenshot, card) for card in cards[::-1]}
         current_equipment_part = self._get_current_equipment_part()
-        rows = self._get_rows_based_on_level(int(current_info['level'].prediction))
+        rows = self.get_rows_based_on_level(int(current_info['level'].prediction))
         board = {row.row: self._check_row(screenshot, row) for row in rows}
 
         return TranscendenceInfo(
