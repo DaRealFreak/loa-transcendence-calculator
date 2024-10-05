@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 import pyautogui
@@ -18,12 +19,14 @@ class SelectNextLevel(Interaction):
 
 
 class Game:
-    def __init__(self, auto_unlock_next_level: bool = True, patience: int = 1):
+    def __init__(self, auto_unlock_next_level: bool = True, patience: int = 1, reset_threshold: float = 0):
         """
         Initializes the game with the given settings.
 
         :param auto_unlock_next_level: if the next level should be automatically unlocked.
         :param patience: the number of recommended resets to tolerate before actually resetting the level.
+        :param reset_threshold: the threshold probability to continue transcending if we're above the percentage even
+                                if a reset is recommended.
         """
         self.auto_unlock_next_level = auto_unlock_next_level
         self.elphago = Elphago(False)
@@ -32,6 +35,7 @@ class Game:
 
         self.resets_recommended = 0
         self.resetting_patience = patience
+        self.resetting_threshold = reset_threshold
 
         # Possible gear parts to transcend in order of the game (left to right and top to bottom)
         self.last_seen_gear_part = ''
@@ -61,6 +65,14 @@ class Game:
         #     print("LostArk process not found.")
         # except Exception as e:
         #     print(f"Error focusing LostArk window: {e}")
+
+    @staticmethod
+    def _extract_probability(text: str) -> float:
+        match = re.search(r'(\d+(\.\d+)?)%', text)
+        if match:
+            return float(match.group(1))
+        else:
+            return 0.0
 
     def determine_move(self, refresh_board: bool = True) -> Interaction:
         """
@@ -111,10 +123,18 @@ class Game:
         :param interaction: The interaction to handle.
         :return: if the current transcending is finished.
         """
+        # Handle reset threshold recommendation override
+        if (isinstance(interaction, Use) or isinstance(interaction, Change)) and interaction.reset_recommended:
+            if self._extract_probability(interaction.probability) > self.resetting_threshold:
+                print(f'Probability of {interaction.probability} is higher than threshold, '
+                      f'overriding reset recommendation.')
+                interaction.reset_recommended = False
+
+        # Reset the resets recommended counter
         if not interaction.reset_recommended:
-            # Reset the resets recommended counter
             self.resets_recommended = 0
 
+        # Something most likely got wrongly detected, warn the user and exit
         if interaction.warning:
             print('Warning: ' + interaction.warning)
             print('Exiting, please check the game state.')
@@ -242,12 +262,18 @@ class Game:
 
         :return:
         """
+        # Sleep to let the finish animation play
+        time.sleep(5)
+
+        # Confirm the previous level
+        self._click(x=962, y=1026)
+        # Wait until we're in the selection menu again
+        time.sleep(3)
+
         # Retrieve the Soundstone fragments from the previous level
         self._click(x=950, y=676)
         time.sleep(0.25)
 
-        # Confirm the previous level
-        self._click(x=962, y=1026)
         # Click on arrow to navigate to the next level
         x_coordinate = 354 + self.possible_gear_parts.index(self.last_seen_gear_part) * 283
         self._click(x=x_coordinate, y=535)
