@@ -4,6 +4,7 @@ from os.path import realpath, dirname
 from pprint import pprint
 
 import pyautogui
+import pyscreeze
 import torch
 import torch.nn.functional as F
 import torchvision.models as models
@@ -228,6 +229,7 @@ class Transcendence:
     def _process_screenshot(self, screenshot: Image, area: ScreenshotArea, model: torch.nn.Module,
                             class_names: list[str],
                             screenshot_type: str = "general", screenshot_dir: str = "screenshots",
+                            screenshot_include_classification: bool = False,
                             save: bool = True) -> Prediction:
         """
         Process the screenshot based on the given area, model, and class names.
@@ -236,20 +238,16 @@ class Transcendence:
         :param area: The area to crop from the screenshot.
         :param model: The model to use for prediction.
         :param class_names: The class names for the model.
+        :param screenshot_type: The type of the screenshot for training and debugging purposes.
+        :param screenshot_dir: The directory to save the screenshot in.
+        :param screenshot_include_classification: If the screenshot should be categorized based on the classification.
+        :param save: If the screenshot should be saved for training and debugging purposes.
         :return:
         """
         # move calculations to the GPU if available, otherwise use the CPU
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # crop the image based on the area and convert it to RGB
         cropped_image = screenshot.crop(area.get_field()).convert('RGB')
-
-        # Optionally save the cropped image for testing/training
-        if save:
-            self._save_screenshot(
-                cropped_image,
-                f"{screenshot_type}_screenshot_{int(time.time() * 1000)}.png",
-                screenshot_dir
-            )
 
         # transform the image and add a batch dimension before moving it to the device
         image_tensor = self.transform(cropped_image).unsqueeze(0).to(device)
@@ -260,7 +258,20 @@ class Transcendence:
             probabilities = F.softmax(output, dim=1)
             # get the predicted class and confidence
             confidence, predicted_class_idx = torch.max(probabilities, 1)
-            return Prediction(confidence.item(), class_names[predicted_class_idx.item()])
+            prediction = Prediction(confidence.item(), class_names[predicted_class_idx.item()])
+
+            # Optionally save the cropped image for testing/training
+            if save:
+                # Categorize the screenshots based on the type
+                if screenshot_include_classification:
+                    screenshot_dir = os.path.join(screenshot_dir, prediction.prediction)
+
+                self._save_screenshot(
+                    cropped_image,
+                    f"{screenshot_type}_screenshot_{int(time.time() * 1000)}.png",
+                    screenshot_dir
+                )
+            return prediction
 
     def _check_card(self, screenshot: Image, card: Card) -> Prediction:
         """
@@ -302,6 +313,7 @@ class Transcendence:
                 self._process_screenshot(screenshot, tile_area, self.models['tiles'], self.class_names['tiles'],
                                          screenshot_type=f"row_{row.row}_tile_{i + 1}",
                                          screenshot_dir=os.path.join(self.screenshot_dir, 'tiles'),
+                                         screenshot_include_classification=True,
                                          save=self.save_screenshots)
             )
 
@@ -328,7 +340,7 @@ class Transcendence:
                     'gloves',
                     'weapon'
                 ][((selection.top + selection.height // 2) // 100) - 1]
-        except pyautogui.ImageNotFoundException:
+        except pyscreeze.ImageNotFoundException:
             return ''
 
     def _get_current_flowers(self) -> int:
@@ -343,7 +355,7 @@ class Transcendence:
                 confidence=0.9, region=(771, 718, 867 - 771, 750 - 718))
             if selection:
                 return len(list(selection))
-        except pyautogui.ImageNotFoundException:
+        except pyscreeze.ImageNotFoundException:
             return 0
 
     @staticmethod
