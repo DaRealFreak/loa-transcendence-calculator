@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from os.path import realpath, dirname
@@ -433,6 +434,15 @@ class Transcendence:
 
         # take a screenshot of the current board to analyze (faster than taking a screenshot for each tile)
         screenshot = pyautogui.screenshot()
+        current_equipment_part = self._get_current_equipment_part()
+        current_flowers = self._get_current_flowers()
+        previous_screenshot_state = self.save_screenshots
+        if current_flowers == 0:
+            logging.debug(
+                "disabling screenshots as no flowers were found and we're likely not in the transcendence minigame"
+            )
+            self.save_screenshots = False
+
         current_info = {
             key: self._process_screenshot(
                 screenshot,
@@ -445,10 +455,11 @@ class Transcendence:
             ) for key in areas
         }
         current_cards = {card.position: self._check_card(screenshot, card) for card in cards[::-1]}
-        current_equipment_part = self._get_current_equipment_part()
-        current_flowers = self._get_current_flowers()
         rows = self.get_rows_based_on_level(int(current_info['level'].prediction))
         board = {row.row: self._check_row(screenshot, row) for row in rows}
+
+        # restore the previous screenshot state after we're done processing the screenshot
+        self.save_screenshots = previous_screenshot_state
 
         return TranscendenceInfo(
             gear_part=current_equipment_part,
