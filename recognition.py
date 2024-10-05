@@ -114,4 +114,5 @@ class ImageRecognizer:
 recognizer = ImageRecognizer(data_type='tiles')
 
 # Evaluate the test dataset and print incorrect classifications
-recognizer.evaluate_dataset()
+recognizer.evaluate_dataset(dataset_dir="test")
+recognizer.evaluate_dataset(dataset_dir="train")
