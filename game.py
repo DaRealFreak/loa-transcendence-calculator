@@ -2,7 +2,9 @@ import logging
 import re
 import time
 
+import psutil
 import pyautogui
+from pywinauto import Application
 
 from calculator import Transcendence, Row, TranscendenceInfo
 from elphago import Elphago, Interaction, Use, Change
@@ -55,25 +57,55 @@ class Game:
             'weapon'
         ]
 
-    @staticmethod
-    def _focus_lostark_window() -> None:
+    def _bring_window_to_foreground(self, pid: int) -> None:
         """
-        Focuses the 'LostArk.exe' process to ensure it is the active window.
+        Brings the window of the given process ID to the foreground.
+
+        :param pid: the process ID to bring to the foreground.
+        :return:
         """
-        # try:
-        #     # Find the LostArk.exe process using pywinauto
-        #     app = pywinauto.Application().connect(title="LOST ARK (64-bit, DX11) v.2.32.4.1")
-        #     print("LostArk process found.")
-        #     app_dialog = app.top_window()
-        #     app_dialog.set_focus()
-        #     print("LostArk window focused.")
-        # except pywinauto.findwindows.ElementNotFoundError:
-        #     print("LostArk process not found.")
-        # except Exception as e:
-        #     print(f"Error focusing LostArk window: {e}")
+        try:
+            # Use the 'win32' backend instead of 'uia' for better window control
+            app = Application(backend="win32").connect(process=pid)
+            # Get the main window
+            window = app.top_window()
+
+            if window.is_active():
+                self.logger.debug(f"Process {pid} is already in the foreground.")
+            else:
+                # If not already focused, bring it to the foreground
+                window.set_focus()
+                # # Minimize and restore to ensure it's brought forward
+                # window.minimize()
+                # time.sleep(0.5)
+                # window.restore()
+                self.logger.info(f"Process {pid} brought to foreground.")
+        except Exception as e:
+            self.logger.error(f"Could not bring process {pid} to foreground: {str(e)}")
+
+    def _focus_lostark_window(self, search_term: str = "LOSTARK.exe") -> None:
+        """
+        Focuses the window of the Lost Ark game.
+
+        :param search_term: the search term to look for in the process name.
+        :return:
+        """
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                if search_term in proc.info['name']:
+                    self._bring_window_to_foreground(proc.info['pid'])
+                    break
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
 
     @staticmethod
     def _extract_probability(text: str) -> float:
+        """
+        Extracts the probability from the given text. Returns 0.0 if no percentage is found.
+
+        :param text: the text to extract the probability from.
+        :return:
+        """
         match = re.search(r'(\d+(\.\d+)?)%', text)
         if match:
             return float(match.group(1))
@@ -188,7 +220,7 @@ class Game:
             else:
                 raise ValueError(f'Invalid card number {interaction.card}')
 
-            print(f'Using card {interaction.card} at position {interaction.row}, {interaction.column}')
+            print(f'Using card {interaction.card} at (row: {interaction.row}, column: {interaction.column})')
         elif isinstance(interaction, Change):
             if interaction.reset_recommended:
                 print('Reset is recommended, but since changes are free, we will change the card')
@@ -323,6 +355,6 @@ class Game:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=True, save_screenshots=True)
+    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=False, save_screenshots=True)
     game.transcendence()
     input('Press Enter to exit...')
