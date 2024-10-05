@@ -549,7 +549,7 @@ class Elphago:
                     else:
                         if not is_change:
                             raise ValueError(f"Card {pos} is recommended but neither change nor use.")
-                        return Change(warning, pos, is_reset_recommended)
+                        return Change(warning, pos, probability_text, is_reset_recommended)
             except Exception as e:
                 self.logger.error(f"Error occurred while getting card {pos}: {e}")
 
