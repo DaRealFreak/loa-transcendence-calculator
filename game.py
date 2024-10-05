@@ -12,14 +12,36 @@ class Reset(Interaction):
         return 'Reset()'
 
 
+class SelectNextLevel(Interaction):
+    def __repr__(self):
+        return 'SelectNextLevel()'
+
+
 class Game:
-    def __init__(self, patience: int = 1):
+    def __init__(self, auto_unlock_next_level: bool = True, patience: int = 1):
+        """
+        Initializes the game with the given settings.
+
+        :param auto_unlock_next_level: if the next level should be automatically unlocked.
+        :param patience: the number of recommended resets to tolerate before actually resetting the level.
+        """
+        self.auto_unlock_next_level = auto_unlock_next_level
         self.elphago = Elphago(False)
         self.calculator = Transcendence(save_screenshots=True)
         self.last_information: TranscendenceInfo | None = None
 
         self.resets_recommended = 0
         self.resetting_patience = patience
+
+        # Possible gear parts to transcend in order of the game (left to right and top to bottom)
+        self.possible_gear_parts = [
+            'helmet',
+            'shoulder',
+            'chestpiece',
+            'pants',
+            'gloves',
+            'weapon'
+        ]
 
     @staticmethod
     def _focus_lostark_window() -> None:
@@ -48,8 +70,8 @@ class Game:
         self._focus_lostark_window()
         self.last_information = self.calculator.get_current_information()
         if self.last_information.flowers == 0:
-            print('0 flowers found, probably level completed, exiting...')
-            exit(0)
+            print('No flowers found on the screen, assume level got completed.')
+            return SelectNextLevel()
 
         if not self.has_flowers_to_continue():
             return Reset()
@@ -145,6 +167,14 @@ class Game:
             print(f'Resetting current level for gear part: {self.last_information.gear_part}')
             self.reset_level()
             return False
+        elif isinstance(interaction, SelectNextLevel):
+            if self.auto_unlock_next_level:
+                print('Selecting next level if possible for gear part: ' + self.last_information.gear_part)
+                self.select_next_level()
+                return False
+            else:
+                print('Auto unlock is disabled, quitting transcendence.')
+                return True
 
         # sleep 2 second to allow the game to process the change
         time.sleep(2)
@@ -184,15 +214,7 @@ class Game:
         self._click(x=958, y=674)
         time.sleep(0.25)
 
-        gear_parts = [
-            'helmet',
-            'shoulder',
-            'chestpiece',
-            'pants',
-            'gloves',
-            'weapon'
-        ]
-        x_coordinate = 246 + gear_parts.index(self.last_information.gear_part) * 283
+        x_coordinate = 246 + self.possible_gear_parts.index(self.last_information.gear_part) * 283
         self._click(x=x_coordinate, y=644)
         time.sleep(0.5)
 
@@ -202,6 +224,30 @@ class Game:
 
         # Reset the resets recommended counter
         self.resets_recommended = 0
+
+    def select_next_level(self) -> None:
+        """
+        Selects the next level if possible for the gear part.
+
+        :return:
+        """
+        # Confirm the previous level
+        self._click(x=962, y=1026)
+        # Click on arrow to navigate to the next level
+        x_coordinate = 354 + self.possible_gear_parts.index(self.last_information.gear_part) * 283
+        self._click(x=x_coordinate, y=535)
+        time.sleep(0.25)
+
+        # Click on the "Liberate" button
+        x_coordinate = 246 + self.possible_gear_parts.index(self.last_information.gear_part) * 283
+        self._click(x=x_coordinate, y=644)
+        time.sleep(0.5)
+
+        # Confirm Dark Fire usage
+        self._click(x=906, y=648)
+
+        # wait for menu animation
+        time.sleep(3)
 
     def transcendence(self) -> None:
         """
