@@ -19,7 +19,8 @@ class SelectNextLevel(Interaction):
 
 
 class Game:
-    def __init__(self, auto_unlock_next_level: bool = True, patience: int = 1, reset_threshold: float = 0):
+    def __init__(self, auto_unlock_next_level: bool = True, patience: int = 1, reset_threshold: float = 0,
+                 save_screenshots: bool = False, headless: bool = True):
         """
         Initializes the game with the given settings.
 
@@ -27,10 +28,12 @@ class Game:
         :param patience: the number of recommended resets to tolerate before actually resetting the level.
         :param reset_threshold: the threshold probability to continue transcending if we're above the percentage even
                                 if a reset is recommended.
+        :param save_screenshots: if the screenshots should be saved for debugging purposes.
+        :param headless: if the browser for elphago should be run in headless mode.
         """
         self.auto_unlock_next_level = auto_unlock_next_level
-        self.elphago = Elphago(False)
-        self.calculator = Transcendence(save_screenshots=True)
+        self.elphago = Elphago(headless)
+        self.calculator = Transcendence(save_screenshots=save_screenshots)
         self.last_information: TranscendenceInfo | None = None
 
         self.resets_recommended = 0
@@ -125,7 +128,7 @@ class Game:
         """
         # Handle reset threshold recommendation override
         if (isinstance(interaction, Use) or isinstance(interaction, Change)) and interaction.reset_recommended:
-            if self._extract_probability(interaction.probability) > self.resetting_threshold:
+            if 0 < self.resetting_threshold < self._extract_probability(interaction.probability):
                 print(f'Probability of {interaction.probability} is higher than threshold, '
                       f'overriding reset recommendation.')
                 interaction.reset_recommended = False
@@ -164,8 +167,8 @@ class Game:
             # Calculate the center coordinates of the card
             top_left = relevant_row.top_left[0] + relevant_row.width * (interaction.column - 1)
             bot_right = relevant_row.top_left[0] + relevant_row.width * interaction.column
-            center = (top_left + bot_right) // 2, (relevant_row.top_left[1] + relevant_row.bot_right[1]) // 2
-            print(f'Clicking at coordinates {center}')
+            center = int((top_left + bot_right) // 2), int((relevant_row.top_left[1] + relevant_row.bot_right[1]) // 2)
+            logging.DEBUG(f'Clicking at coordinates {center}')
 
             if interaction.card == 1:
                 self._click(x=1100, y=900)
@@ -233,11 +236,15 @@ class Game:
         self._click(x=1818, y=960)
         time.sleep(0.5)
         # check the checkbox for understanding the reset rules (was different positions depending on gold or tickets)
-        self._click(x=885, y=622)
-        self._click(x=887, y=631)
-        time.sleep(0.25)
-        # press okay button
-        self._click(x=901, y=669)
+        possible_checkbox_positions = [
+            (885, 622),
+            (887, 631)
+        ]
+        for position in possible_checkbox_positions:
+            self._click(x=position[0], y=position[1])
+            # try to press okay button before checking the next checkbox
+            self._click(x=901, y=669)
+
         # wait for menu animation
         time.sleep(1)
 
@@ -305,6 +312,6 @@ class Game:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game()
+    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, save_screenshots=True)
     game.transcendence()
     input('Press Enter to exit...')
