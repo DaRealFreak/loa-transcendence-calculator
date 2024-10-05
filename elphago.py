@@ -449,16 +449,18 @@ class Elphago:
 
         return None, None
 
-    def sync_transcendence_info(self, info: TranscendenceInfo) -> None:
+    def sync_transcendence_info(self, info: TranscendenceInfo, synchronize_board: bool = True) -> None:
         """
         Synchronize the board with the TranscendenceInfo object.
 
+        :param synchronize_board: Whether to synchronize the board state.
         :param info: The TranscendenceInfo object to sync with.
         """
         self._select_board(info.gear_part, int(info.level.prediction), int(info.grace.prediction))
         self._set_changes(int(info.changes.prediction))
         self._set_tries(int(info.tries.prediction))
-        self._synchronize_board(info.board)
+        if synchronize_board:
+            self._synchronize_board(info.board)
         for pos, card in info.cards.items():
             self._select_card(card.prediction, pos)
 

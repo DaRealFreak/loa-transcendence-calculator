@@ -38,13 +38,23 @@ class Game:
         # except Exception as e:
         #     print(f"Error focusing LostArk window: {e}")
 
-    def determine_move(self) -> Interaction:
+    def determine_move(self, refresh_board: bool = True) -> Interaction:
+        """
+        Determines the next move to make in the game based on elphago.
+
+        :param refresh_board:
+        :return:
+        """
         self._focus_lostark_window()
         self.last_information = self.calculator.get_current_information()
+        if self.last_information.flowers == 0:
+            print('0 flowers found, probably level completed, exiting...')
+            exit(0)
+
         if not self.has_flowers_to_continue():
             return Reset()
 
-        self.elphago.sync_transcendence_info(self.last_information)
+        self.elphago.sync_transcendence_info(self.last_information, refresh_board)
         return self.elphago.calculate()
 
     def has_flowers_to_continue(self) -> bool:
@@ -161,7 +171,8 @@ class Game:
         """
         self._click(x=1818, y=960)
         time.sleep(0.5)
-        # check the checkbox for understanding the reset rules
+        # check the checkbox for understanding the reset rules (was different positions depending on gold or tickets)
+        self._click(x=885, y=622)
         self._click(x=887, y=631)
         time.sleep(0.25)
         # press okay button
@@ -192,10 +203,16 @@ class Game:
         # Reset the resets recommended counter
         self.resets_recommended = 0
 
-    def transcendence(self):
+    def transcendence(self) -> None:
+        """
+        Starts the transcending process.
+
+        :return:
+        """
         next_action = self.determine_move()
         while not self.handle_interaction(next_action):
-            next_action = self.determine_move()
+            refresh = not isinstance(next_action, Change)
+            next_action = self.determine_move(refresh_board=refresh)
 
 
 if __name__ == '__main__':
