@@ -14,4 +14,5 @@ __pycache__/
 assets/transcendence/dumps
 bin
 screenshots
-page_screenshot.png
+screenshot.png
+current_board.png

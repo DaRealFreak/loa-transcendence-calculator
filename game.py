@@ -31,6 +31,9 @@ class Game:
         :param save_screenshots: if the screenshots should be saved for debugging purposes.
         :param headless: if the browser for elphago should be run in headless mode.
         """
+        # Set up a logger
+        self.logger = logging.getLogger(__name__)
+
         self.auto_unlock_next_level = auto_unlock_next_level
         self.elphago = Elphago(headless)
         self.calculator = Transcendence(save_screenshots=save_screenshots)
@@ -45,7 +48,7 @@ class Game:
         self.last_seen_transcendence_level = 0
         self.possible_gear_parts = [
             'helmet',
-            'shoulder',
+            'shoulders',
             'chestpiece',
             'pants',
             'gloves',
@@ -140,6 +143,7 @@ class Game:
         # Something most likely got wrongly detected, warn the user and exit
         if interaction.warning:
             print('Warning: ' + interaction.warning)
+            self.elphago.save_screenshot(filename='current_board.png')
             print('Exiting, please check the game state.')
             return True
 
@@ -167,8 +171,11 @@ class Game:
             # Calculate the center coordinates of the card
             top_left = relevant_row.top_left[0] + relevant_row.width * (interaction.column - 1)
             bot_right = relevant_row.top_left[0] + relevant_row.width * interaction.column
-            center = int((top_left + bot_right) // 2), int((relevant_row.top_left[1] + relevant_row.bot_right[1]) // 2)
-            logging.DEBUG(f'Clicking at coordinates {center}')
+            center = (
+                int((top_left + bot_right) // 2),
+                int((relevant_row.top_left[1] + relevant_row.bot_right[1]) // 2)
+            )
+            self.logger.debug(f'Clicking at coordinates {center}')
 
             if interaction.card == 1:
                 self._click(x=1100, y=900)
@@ -306,12 +313,16 @@ class Game:
         next_action = self.determine_move()
         while not self.handle_interaction(next_action):
             refresh = not isinstance(next_action, Change)
+            next_level = isinstance(next_action, SelectNextLevel)
             next_action = self.determine_move(refresh_board=refresh)
+            if next_level and isinstance(next_action, SelectNextLevel):
+                print('SelectNextLevel interaction detected twice in a row, probably out of Dark Fires, exiting.')
+                break
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, save_screenshots=True)
+    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=True, save_screenshots=True)
     game.transcendence()
     input('Press Enter to exit...')
