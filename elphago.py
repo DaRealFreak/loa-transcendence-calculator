@@ -68,8 +68,10 @@ class Elphago:
         # Set up a logger
         self.logger = logging.getLogger(__name__)
 
+        self.headless = headless
+
         # Set up the Firefox WebDriver
-        self._setup_firefox(headless)
+        self._setup_firefox()
         self.driver.get(self.ELPHAGO_URL)
 
         # Toggle the checkbox and click the confirm button on the page
@@ -102,7 +104,7 @@ class Elphago:
         shutil.copy(gecko_path, self.GECKODRIVER_PATH)
         self.logger.info(f"Geckodriver downloaded and saved to {self.GECKODRIVER_PATH}")
 
-    def _setup_firefox(self, headless: bool = True) -> None:
+    def _setup_firefox(self) -> None:
         """
         Setup Firefox WebDriver using geckodriver, either from the local bin directory or downloading it on first run.
         """
@@ -113,7 +115,7 @@ class Elphago:
 
         # Setup Firefox options
         firefox_options = Options()
-        if headless:
+        if self.headless:
             # Run in headless mode
             firefox_options.add_argument("--headless")
 
@@ -128,7 +130,7 @@ class Elphago:
         self.driver = webdriver.Firefox(service=service, options=firefox_options)
 
         # Move the window to the left side of the screen and maximize it
-        if not headless:
+        if not self.headless:
             self.driver.set_window_position(-1000, 0)
             self.driver.maximize_window()
 
@@ -463,6 +465,11 @@ class Elphago:
             self._synchronize_board(info.board)
         for pos, card in info.cards.items():
             self._select_card(card.prediction, pos)
+        # primarily for visibility purposes since our headless initial selection click opens the selection menu
+        # so even though the card got properly selected all menu items are still open
+        if not self.headless:
+            for pos, card in info.cards.items():
+                self._select_card(card.prediction, pos)
 
     def calculate(self) -> Interaction | None:
         """

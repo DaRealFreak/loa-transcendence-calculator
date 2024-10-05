@@ -34,6 +34,7 @@ class Game:
         self.resetting_patience = patience
 
         # Possible gear parts to transcend in order of the game (left to right and top to bottom)
+        self.last_seen_gear_part = ''
         self.possible_gear_parts = [
             'helmet',
             'shoulder',
@@ -69,6 +70,9 @@ class Game:
         """
         self._focus_lostark_window()
         self.last_information = self.calculator.get_current_information()
+        if self.last_information.gear_part and self.last_information.gear_part != self.last_seen_gear_part:
+            self.last_seen_gear_part = self.last_information.gear_part
+
         if self.last_information.flowers == 0:
             print('No flowers found on the screen, assume level got completed.')
             return SelectNextLevel()
@@ -76,7 +80,7 @@ class Game:
         if not self.has_flowers_to_continue():
             return Reset()
 
-        self.elphago.sync_transcendence_info(self.last_information, refresh_board)
+        self.elphago.sync_transcendence_info(self.last_information, synchronize_board=refresh_board)
         return self.elphago.calculate()
 
     def has_flowers_to_continue(self) -> bool:
@@ -234,12 +238,12 @@ class Game:
         # Confirm the previous level
         self._click(x=962, y=1026)
         # Click on arrow to navigate to the next level
-        x_coordinate = 354 + self.possible_gear_parts.index(self.last_information.gear_part) * 283
+        x_coordinate = 354 + self.possible_gear_parts.index(self.last_seen_gear_part) * 283
         self._click(x=x_coordinate, y=535)
         time.sleep(0.25)
 
         # Click on the "Liberate" button
-        x_coordinate = 246 + self.possible_gear_parts.index(self.last_information.gear_part) * 283
+        x_coordinate = 246 + self.possible_gear_parts.index(self.last_seen_gear_part) * 283
         self._click(x=x_coordinate, y=644)
         time.sleep(0.5)
 

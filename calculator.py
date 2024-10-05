@@ -340,7 +340,7 @@ class Transcendence:
                     'gloves',
                     'weapon'
                 ][((selection.top + selection.height // 2) // 100) - 1]
-        except pyscreeze.ImageNotFoundException:
+        except (pyscreeze.ImageNotFoundException, pyautogui.ImageNotFoundException):
             return ''
 
     def _get_current_flowers(self) -> int:
@@ -355,7 +355,7 @@ class Transcendence:
                 confidence=0.9, region=(771, 718, 867 - 771, 750 - 718))
             if selection:
                 return len(list(selection))
-        except pyscreeze.ImageNotFoundException:
+        except (pyscreeze.ImageNotFoundException, pyautogui.ImageNotFoundException):
             return 0
 
     @staticmethod
