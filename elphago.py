@@ -24,13 +24,15 @@ class Interaction:
 
 
 class Change(Interaction):
-    def __init__(self, warning: str, card: int, reset_recommended: bool):
+    def __init__(self, warning: str, card: int, probability: str, reset_recommended: bool):
         self.warning = warning
         self.card = card
+        self.probability = probability
         self.reset_recommended = reset_recommended
 
     def __str__(self):
-        return f"Change(card={self.card}, warning={self.warning}, reset_recommended={self.reset_recommended})"
+        return f"Change(card={self.card}, probability={self.probability}, warning={self.warning}, " \
+               f"reset_recommended={self.reset_recommended})"
 
     def __repr__(self):
         return str(self)
