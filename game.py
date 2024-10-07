@@ -90,13 +90,19 @@ class Game:
         :param search_term: the search term to look for in the process name.
         :return:
         """
+        found_process = False
         for proc in psutil.process_iter(['pid', 'name']):
             try:
                 if search_term in proc.info['name']:
+                    found_process = True
                     self._bring_window_to_foreground(proc.info['pid'])
                     break
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
+
+        if not found_process:
+            self.logger.error(f"Could not find process with search term '{search_term}'.")
+            raise RuntimeError(f"Could not find process with search term '{search_term}'.")
 
     @staticmethod
     def _extract_probability(text: str) -> float:
