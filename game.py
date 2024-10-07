@@ -314,6 +314,10 @@ class Game:
 
         :return:
         """
+        if self.last_seen_gear_part not in self.possible_gear_parts:
+            self.logger.error(f'Invalid gear part {self.last_seen_gear_part}, please start while in the minigame.')
+            raise ValueError(f'Invalid gear part {self.last_seen_gear_part}')
+
         # Sleep to let the finish animation play
         time.sleep(5)
 
@@ -361,6 +365,6 @@ class Game:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=False, save_screenshots=True)
+    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=True, save_screenshots=True)
     game.transcendence()
     input('Press Enter to exit...')
