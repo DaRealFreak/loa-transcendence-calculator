@@ -226,7 +226,9 @@ class Game:
             else:
                 raise ValueError(f'Invalid card number {interaction.card}')
 
-            print(f'Using card {interaction.card} at (row: {interaction.row}, column: {interaction.column})')
+            print(
+                f'Using card {interaction.card_name} (row: {interaction.row}, column: {interaction.column}, pos: {interaction.card})'
+            )
         elif isinstance(interaction, Change):
             if interaction.reset_recommended:
                 print('Reset is recommended, but since changes are free, we will change the card')
@@ -365,6 +367,6 @@ class Game:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=True, save_screenshots=True)
+    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=False, save_screenshots=True)
     game.transcendence()
     input('Press Enter to exit...')

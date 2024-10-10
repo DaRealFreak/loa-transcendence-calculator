@@ -39,17 +39,19 @@ class Change(Interaction):
 
 
 class Use(Interaction):
-    def __init__(self, warning: str, row: int, column: int, card: int, probability: str, reset_recommended: bool):
+    def __init__(self, warning: str, row: int, column: int, card: int, card_name:str,
+                 probability: str, reset_recommended: bool):
         self.warning = warning
         self.row = row
         self.column = column
         self.card = card
+        self.card_name = card_name
         self.probability = probability
         self.reset_recommended = reset_recommended
 
     def __str__(self):
-        return f"Use(row={self.row}, column={self.column}, card={self.card}, probability={self.probability}, " \
-               f"warning={self.warning}, reset_recommended={self.reset_recommended})"
+        return f"Use(card={self.card}, card_name={self.card_name}, row={self.row}, column={self.column}, " \
+               f"probability={self.probability}, warning={self.warning}, reset_recommended={self.reset_recommended})"
 
     def __repr__(self):
         return str(self)
@@ -79,6 +81,7 @@ class Elphago:
         # Toggle the checkbox and click the confirm button on the page
         self._toggle_checkbox_and_confirm()
 
+        self._last_info = None
         self.current_gear_part = ''
         self.current_level = 0
         self.current_grace = 0
@@ -460,6 +463,7 @@ class Elphago:
         :param synchronize_board: Whether to synchronize the board state.
         :param info: The TranscendenceInfo object to sync with.
         """
+        self._last_info = info
         self._select_board(info.gear_part, int(info.level.prediction), int(info.grace.prediction))
         self._set_changes(int(info.changes.prediction))
         self._set_tries(int(info.tries.prediction))
@@ -545,7 +549,10 @@ class Elphago:
                 is_change = 'Change' == card_element.find_element(By.CSS_SELECTOR, "span").text
                 if is_recommended_card:
                     if row is not None and column is not None:
-                        return Use(warning, row, column, pos, probability_text, is_reset_recommended)
+                        card_name = ''
+                        if pos in self._last_info.cards:
+                            card_name = self._last_info.cards[pos].prediction
+                        return Use(warning, row, column, pos, card_name, probability_text, is_reset_recommended)
                     else:
                         if not is_change:
                             raise ValueError(f"Card {pos} is recommended but neither change nor use.")
