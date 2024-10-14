@@ -22,7 +22,8 @@ class SelectNextLevel(Interaction):
 
 class Game:
     def __init__(self, auto_unlock_next_level: bool = True, patience: int = 1, reset_threshold: float = 0,
-                 save_screenshots: bool = False, headless: bool = True):
+                 save_screenshots: bool = False, headless: bool = True,
+                 sleep_time_after_window_focus: int = 0, ignore_warnings: bool = False):
         """
         Initializes the game with the given settings.
 
@@ -32,11 +33,16 @@ class Game:
                                 if a reset is recommended.
         :param save_screenshots: if the screenshots should be saved for debugging purposes.
         :param headless: if the browser for elphago should be run in headless mode.
+        :param sleep_time_after_window_focus: the time to sleep after bringing the window to the foreground.
+        :param ignore_warnings: if warnings should be ignored and the game should continue
         """
         # Set up a logger
         self.logger = logging.getLogger(__name__)
 
+        # some main settings
         self.auto_unlock_next_level = auto_unlock_next_level
+        self.sleep_time_after_window_focus = sleep_time_after_window_focus
+
         self.elphago = Elphago(headless)
         self.calculator = Transcendence(save_screenshots=save_screenshots)
         self.last_information: TranscendenceInfo | None = None
@@ -44,6 +50,7 @@ class Game:
         self.resets_recommended = 0
         self.resetting_patience = patience
         self.resetting_threshold = reset_threshold
+        self.ignore_warnings = ignore_warnings
 
         # Possible gear parts to transcend in order of the game (left to right and top to bottom)
         self.last_seen_gear_part = ''
@@ -80,6 +87,8 @@ class Game:
                 # time.sleep(0.5)
                 # window.restore()
                 self.logger.info(f"Process {pid} brought to foreground.")
+                if self.sleep_time_after_window_focus > 0:
+                    time.sleep(self.sleep_time_after_window_focus)
         except Exception as e:
             self.logger.error(f"Could not bring process {pid} to foreground: {str(e)}")
 
@@ -181,9 +190,13 @@ class Game:
         # Something most likely got wrongly detected, warn the user and exit
         if interaction.warning:
             print('Warning: ' + interaction.warning)
-            self.elphago.save_screenshot(filename='current_board.png')
-            print('Exiting, please check the game state.')
-            return True
+            self.elphago.save_screenshot(filename=f'current_board_{int(time.time() * 1000)}.png')
+
+            if not self.ignore_warnings:
+                print('Exiting, please check the game state.')
+                return True
+            else:
+                print('Ignoring warning and continuing...')
 
         # Check if there are enough flowers to continue and we aren't in a SelectNextLevel interaction
         if not self.has_flowers_to_continue() and not isinstance(interaction, SelectNextLevel):
@@ -367,6 +380,7 @@ class Game:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=False, save_screenshots=True)
+    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=True, save_screenshots=True,
+                sleep_time_after_window_focus=0, ignore_warnings=False)
     game.transcendence()
     input('Press Enter to exit...')
