@@ -39,7 +39,7 @@ class Change(Interaction):
 
 
 class Use(Interaction):
-    def __init__(self, warning: str, row: int, column: int, card: int, card_name:str,
+    def __init__(self, warning: str, row: int, column: int, card: int, card_name: str,
                  probability: str, reset_recommended: bool):
         self.warning = warning
         self.row = row
