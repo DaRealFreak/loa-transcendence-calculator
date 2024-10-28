@@ -88,11 +88,13 @@ class Elphago:
 
     def __del__(self):
         # Quit the WebDriver when the object is deleted
-        self.driver.quit()
+        if self.driver:
+            self.driver.quit()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         # Quit the WebDriver when exiting the context manager
-        self.driver.quit()
+        if self.driver:
+            self.driver.quit()
 
     def _download_geckodriver_to_bin(self) -> None:
         """
