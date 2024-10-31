@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the name of the archive
-archive_name="transcendence_calculator_$(date +'%Y%m%d').tar.gz"
+archive_name="transcendence_calculator_$(date +'%Y%m%d').zip"
 
 base_dir=$(dirname "$0")
 cd "$base_dir/../" || exit
@@ -19,7 +19,8 @@ find bin -type d -exec mkdir -p "$temp_dir/{}" \;
 
 # Move into the temporary directory and create the archive from its contents
 cd "$temp_dir" || exit
-tar -cvzf "$archive_name" *
+#tar -cvzf "$archive_name" *
+zip -r "${archive_name}" *
 
 # Move the archive back to the original directory
 mv "$archive_name" "$OLDPWD"
