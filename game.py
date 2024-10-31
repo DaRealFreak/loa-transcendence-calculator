@@ -1,7 +1,9 @@
 import logging
+import multiprocessing
 import re
 import time
 
+import keyboard
 import psutil
 import pyautogui
 from pywinauto import Application
@@ -377,10 +379,54 @@ class Game:
                 break
 
 
+def start_game_process(**kwargs):
+    """
+    Starts the game process with the given keyword arguments.
+
+    :param kwargs:
+    :return:
+    """
+    game = Game(**kwargs)
+    game.transcendence()
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    game = Game(auto_unlock_next_level=True, patience=1, reset_threshold=10.0, headless=True, save_screenshots=True,
-                sleep_time_after_window_focus=0, ignore_warnings=False)
-    game.transcendence()
-    input('Press Enter to exit...')
+    # Available game keyword arguments
+    game_kwargs = {
+        'auto_unlock_next_level': True,
+        'patience': 1,
+        'reset_threshold': 10.0,
+        'headless': True,
+        'save_screenshots': True,
+        'sleep_time_after_window_focus': 0,
+        'ignore_warnings': True
+    }
+
+    # Set up process with target function `start_game_process` and pass the kwargs
+    p = multiprocessing.Process(
+        target=start_game_process,
+        kwargs=game_kwargs,
+        name="Transcendence"
+    )
+    p.start()
+
+    start_time = time.time()
+    while True:
+        if not p.is_alive():
+            print("process has terminated")
+            break
+
+        if keyboard.is_pressed('esc'):
+            print("esc key pressed, terminating process")
+            p.terminate()
+            break
+
+        if time.time() - start_time > 30 * 60:
+            print("30 minutes have passed, terminating process")
+            p.terminate()
+            break
+
+        # sleep for 0.1 seconds to avoid 100% CPU usage
+        time.sleep(0.1)
