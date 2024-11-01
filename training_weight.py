@@ -188,7 +188,7 @@ classifier = WeightModelTraining(
     data_dir='dataset/', data_type='tiles',
     num_epochs=500,
     patience=0,
-    all_correct_required=20,
+    all_correct_required=30,
     add_noise=False, add_brightness=True
 )
 classifier.train()
