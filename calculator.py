@@ -207,10 +207,10 @@ class Transcendence:
         ]
 
         for model_dir in model_dirs:
-            self.class_names[model_dir] = os.listdir(f"dataset/{model_dir}/train")
+            self.class_names[model_dir] = os.listdir(f"{self.script_dir}/dataset/{model_dir}/train")
             num_classes = len(self.class_names[model_dir])
             self.models[model_dir] = self._load_model(
-                f'models/{model_dir}/best_tile_classifier.pth',
+                f'{self.script_dir}/models/{model_dir}/best_tile_classifier.pth',
                 num_classes
             )
 
