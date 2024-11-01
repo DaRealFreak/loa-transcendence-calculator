@@ -562,15 +562,21 @@ class Elphago:
             except Exception as e:
                 self.logger.error(f"Error occurred while getting card {pos}: {e}")
 
-    def save_screenshot(self, filename: str = 'screenshot.png') -> None:
+    def save_screenshot(self, filename: str = 'screenshot.png', folder: str = '') -> None:
         """
         Save a screenshot of the current page.
 
+        :param folder: The folder to save the screenshot in. Default is the current directory.
         :param filename: The filename to save the screenshot as. Default is 'screenshot.png'.
         :return:
         """
         # Take a screenshot after interaction
-        self.driver.save_screenshot(filename)
+        if folder:
+            full_filename = os.path.join(folder, filename)
+        else:
+            full_filename = filename
+
+        self.driver.save_screenshot(full_filename)
         self.logger.info(f"Screenshot saved as '{filename}'")
 
 

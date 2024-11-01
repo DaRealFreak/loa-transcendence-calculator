@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import re
 import time
+from os.path import realpath, dirname, join
 
 import keyboard
 import psutil
@@ -39,6 +40,7 @@ class Game:
         :param ignore_warnings: if warnings should be ignored and the game should continue
         """
         # Set up a logger
+        self.script_dir = realpath(dirname(__file__))
         self.logger = logging.getLogger(__name__)
 
         # some main settings
@@ -46,7 +48,10 @@ class Game:
         self.sleep_time_after_window_focus = sleep_time_after_window_focus
 
         self.elphago = Elphago(headless)
-        self.calculator = Transcendence(save_screenshots=save_screenshots)
+        self.calculator = Transcendence(
+            save_screenshots=save_screenshots,
+            screenshot_dir=join(self.script_dir, 'screenshots')
+        )
         self.last_information: TranscendenceInfo | None = None
 
         self.resets_recommended = 0
@@ -192,7 +197,10 @@ class Game:
         # Something most likely got wrongly detected, warn the user and exit
         if interaction.warning:
             print('Warning: ' + interaction.warning)
-            self.elphago.save_screenshot(filename=f'current_board_{int(time.time() * 1000)}.png')
+            self.elphago.save_screenshot(
+                filename=f'current_board_{int(time.time() * 1000)}.png',
+                folder=self.script_dir
+            )
 
             if not self.ignore_warnings:
                 print('Exiting, please check the game state.')
@@ -386,6 +394,10 @@ def start_game_process(**kwargs):
     :param kwargs:
     :return:
     """
+    # Set up logging configuration in the child process
+    logging.basicConfig(level=logging.INFO)
+    logging.info("Starting game process...")
+
     game = Game(**kwargs)
     game.transcendence()
 
