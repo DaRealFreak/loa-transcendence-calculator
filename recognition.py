@@ -90,6 +90,28 @@ class ImageRecognizer:
 
         return predicted_class, confidence_value
 
+    def evaluate_screenshots(self, screenshot_dir='screenshots'):
+        """
+        Evaluates the model on the screenshots and prints out incorrect predictions.
+
+        :param screenshot_dir: Directory of the screenshots.
+        """
+        # list all directories in the screenshot directory and iterate over them
+        target_dir = os.path.join(screenshot_dir, self.data_type)
+        for directory in os.listdir(target_dir):
+            if not os.path.isdir(os.path.join(target_dir, directory)):
+                continue
+
+            for file in os.listdir(os.path.join(target_dir, directory)):
+                image_path = os.path.join(target_dir, directory, file)
+                predicted_class, confidence = self.classify_tile(image_path)
+
+                # Print only when the prediction is incorrect
+                if predicted_class != directory:
+                    print(
+                        f'Predicted tile for {file} is: {predicted_class}, correct is {directory}, confidence: {confidence:.2f}'
+                    )
+
     def evaluate_dataset(self, dataset_dir='test'):
         """
         Evaluates the model on the test dataset and prints out incorrect predictions.
@@ -111,8 +133,9 @@ class ImageRecognizer:
 
 # Example usage:
 # Initialize the recognizer for tile classification
-recognizer = ImageRecognizer(data_type='tiles')
+recognizer = ImageRecognizer(data_type='level')
 
 # Evaluate the test dataset and print incorrect classifications
-recognizer.evaluate_dataset(dataset_dir="test")
-recognizer.evaluate_dataset(dataset_dir="train")
+# recognizer.evaluate_dataset(dataset_dir="test")
+# recognizer.evaluate_dataset(dataset_dir="train")
+recognizer.evaluate_screenshots(screenshot_dir='screenshots')
