@@ -289,6 +289,7 @@ class Transcendence:
             self.class_names['cards'],
             screenshot_type=f"card_{card.position}",
             screenshot_dir=os.path.join(self.screenshot_dir, 'cards'),
+            screenshot_include_classification=True,
             save=self.save_screenshots
         )
 
@@ -451,6 +452,7 @@ class Transcendence:
                 self.class_names[key],
                 screenshot_type=key,
                 screenshot_dir=os.path.join(self.screenshot_dir, key),
+                screenshot_include_classification=True,
                 save=self.save_screenshots
             ) for key in areas
         }
