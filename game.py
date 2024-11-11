@@ -435,7 +435,7 @@ if __name__ == '__main__':
             p.terminate()
             break
 
-        if time.time() - start_time > 30 * 60:
+        if time.time() - start_time > 60 * 60:
             print("60 minutes have passed, terminating process")
             p.terminate()
             break
